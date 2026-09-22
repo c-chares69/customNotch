@@ -21,6 +21,7 @@ public sealed class PillWindow : Window
     private readonly Path _shape = new() { Fill = Brushes.Black, Stroke = new SolidColorBrush(Color.FromRgb(0x2e, 0x2e, 0x2e)), StrokeThickness = 1 };
     private readonly StackPanel _cells = new();
     private readonly Rectangle _grip = new() { Width = 4, Height = 28, RadiusX = 2, RadiusY = 2, Fill = new SolidColorBrush(Color.FromArgb(0, 255, 255, 255)) };
+    private readonly Dictionary<string, Cells.CellHost> _hosts = new();
     private PillMetrics _m;
     private Point? _dragFrom;
 
@@ -83,6 +84,7 @@ public sealed class PillWindow : Window
     /// contre le bord ; la réserve de la carte est côté libre.</summary>
     private void Layout()
     {
+        RebuildCells();
         var extent = _m.Extent(CellCount);
         var reserve = _m.CardWidth + _m.Tail + _m.CardGap;
         _shape.Data = PillShape.Build(_m, Pill.Edge, CellCount);
@@ -107,7 +109,8 @@ public sealed class PillWindow : Window
             var top = Pill.Edge == "bottom" ? reserve : 0;
             Canvas.SetLeft(_shape, left); Canvas.SetTop(_shape, top);
             _cells.Orientation = Orientation.Horizontal;
-            Canvas.SetLeft(_cells, left + _m.Fillet + _m.Padding); Canvas.SetTop(_cells, top);
+            _cells.VerticalAlignment = VerticalAlignment.Center;
+            Canvas.SetLeft(_cells, left + _m.Fillet + _m.Padding); Canvas.SetTop(_cells, top + (_m.Width - (_m.Ring + _m.Caption)) / 2);
             _cells.Height = _m.Width;
             _grip.Width = 28; _grip.Height = 4;
             Canvas.SetLeft(_grip, left + _m.Fillet + 4); Canvas.SetTop(_grip, top + (Pill.Edge == "bottom" ? 6 : _m.Width - 10));
@@ -196,6 +199,46 @@ public sealed class PillWindow : Window
         menu.IsOpen = true;
     }
 
-    public void UpdateCell(string cellId) { }
-    public void Tick() { }
+    /// <summary>Reconstruit la liste des cellules visibles ; réutilise les CellHost existants (par id) tant que leur
+    /// source ne change pas, pour ne pas perdre l'animation en cours d'une pression ou d'un survol.</summary>
+    private void RebuildCells()
+    {
+        _cells.Children.Clear();
+        var horizontal = !Vertical;
+        foreach (var cell in Pill.Cells.Where(c => c.Visible))
+        {
+            if (!_hosts.TryGetValue(cell.Id, out var host) || host.Cell.Source != cell.Source)
+            {
+                host = new Cells.CellHost(cell, _m);
+                host.Hovered += OnCellHovered;
+                host.Unhovered += OnCellUnhovered;
+                host.Clicked += OnCellClicked;
+                host.RightClicked += h => { ShowMenu(); };
+                _hosts[cell.Id] = host;
+            }
+            host.Rebind(cell);
+            host.SetHorizontal(horizontal);
+            _cells.Children.Add(host);
+            if (_host.View(cell.Id) is { } view) host.Render(view);
+        }
+        foreach (var id in _hosts.Keys.Where(id => Pill.Cells.All(c => c.Id != id)).ToList()) _hosts.Remove(id);
+    }
+
+    public void UpdateCell(string cellId)
+    {
+        if (_hosts.TryGetValue(cellId, out var host) && _host.View(cellId) is { } view) host.Render(view);
+        foreach (var group in Pill.Cells.Where(c => c.IsGroup && c.Children!.Contains(cellId)))
+            if (_hosts.TryGetValue(group.Id, out var g) && _host.View(group.Id) is { } gv) g.Render(gv);
+    }
+
+    /// <summary>À chaque tick, seules les cellules périmées se redessinent : l'âge affiché (« il y a 3 min ») vieillit.</summary>
+    public void Tick()
+    {
+        foreach (var (id, host) in _hosts) if (host.Last is { Stale: true } && _host.View(id) is { } v) host.Render(v);
+    }
+
+    // Tâche 11 : carte hover au survol, action au clic.
+    private void OnCellHovered(Cells.CellHost h) { }
+    private void OnCellUnhovered(Cells.CellHost h) { }
+    private void OnCellClicked(Cells.CellHost h) { }
 }
