@@ -211,8 +211,7 @@ Port fidèle de la logique Windows de codenotch (`usage.rs`, `claude_auth.rs`, `
   aux identifiants.
 - **Activité** : hooks installés (fusion, jamais écrasement) dans `~/.claude/settings.json` : `SessionStart`, `UserPromptSubmit`,
   `PreToolUse`/`PostToolUse` (`matcher: "*"`), `Notification`, `Stop`, `SessionEnd` → `CustomNotch.Hook.exe <event>`.
-  Le hook POSTe `/event?e=<event>&ppid=<pid>` (corps = JSON du hook, ≤ 256 Ko) sur `127.0.0.1:<port>` (défaut 48667, différent
-  de codenotch pour cohabiter), lance l'app si absente, et sort toujours en 0 sous 2 s.
+  Le hook POSTe `/event?e=<event>&ppid=<pid>` (corps = JSON du hook, ≤ 256 Ko) sur `127.0.0.1:<port>` (défaut 48667), lance l'app si absente, et sort toujours en 0 sous 2 s.
 - **Serveur local** : `HttpListener`, POST seulement, refus des requêtes avec `Origin`/`Referer` (CSRF), **aucune autre route**.
   `ActivityStore` : sessions par `session_id` (titre = dossier), états `running → done → dismissed`, `attention` posé par
   `Notification`, balayage des sessions abandonnées ; désinstallation des hooks retirée proprement depuis Settings.
