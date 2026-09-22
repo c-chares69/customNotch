@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Le client minuscule appelé par les hooks Claude Code (rempli dans le plan 2). Pas de dépendance : il doit démarrer en moins de 100 ms. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>customNotch-hook</AssemblyName>
+    <RootNamespace>CustomNotch.Hook</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+</Project>

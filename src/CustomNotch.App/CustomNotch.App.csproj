@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- L'application Windows : pilules, carte hover, tray. WPF ; WinForms seulement pour NotifyIcon et Screen. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>customNotch</AssemblyName>
+    <RootNamespace>CustomNotch.App</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <SatelliteResourceLanguages>fr</SatelliteResourceLanguages>
+    <Description>customNotch - strip de statut et de lancement</Description>
+    <!-- WFO0003 : l'analyseur WinForms suppose une appli WinForms pure ; ici WinForms ne sert qu'à
+         NotifyIcon/Screen dans une appli WPF, où le manifeste est la bonne façon de déclarer le DPI. -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CustomNotch.Core\CustomNotch.Core.csproj" />
+  </ItemGroup>
+  <!-- WinForms n'est là que pour NotifyIcon et Screen : ses noms ne doivent pas entrer en collision avec WPF. -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+</Project>

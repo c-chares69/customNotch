@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Le cœur sans interface : modèle, configuration, sources, ordonnanceur. Cible net10.0 tout court :
+       il doit rester portable ; les appels Windows vivent dans Platform/ derrière OperatingSystem.IsWindows(). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>CustomNotch.Core</RootNamespace>
+    <AssemblyName>CustomNotch.Core</AssemblyName>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="CustomNotch.Core.Tests" />
+  </ItemGroup>
+</Project>
