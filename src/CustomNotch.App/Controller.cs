@@ -22,6 +22,7 @@ public sealed class Controller : IPillHost
     private readonly TrayIcon _tray = new();
     private readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromSeconds(1) };
     private bool _allHidden;
+    private bool _stopped;
 
     public Controller(string home)
     {
@@ -107,13 +108,17 @@ public sealed class Controller : IPillHost
         Application.Current.Shutdown();
     }
 
+    /// <summary>Idempotente : Quit() et App.OnExit l'appellent tous les deux, le second appel ne doit rien refaire.</summary>
     public void Stop()
     {
+        if (_stopped) return;
+        _stopped = true;
         _tick.Stop();
         _scheduler.Dispose();
         _config.Dispose();
         _tray.Dispose();
         foreach (var p in _pills.Values) p.Close();
+        _pills.Clear();
     }
 
     // ---- IPillHost -------------------------------------------------------------------------------------------
