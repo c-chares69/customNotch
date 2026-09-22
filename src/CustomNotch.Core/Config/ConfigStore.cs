@@ -13,6 +13,7 @@ public sealed class ConfigStore : IDisposable
     private readonly List<FileSystemWatcher> _watchers = new();
     private readonly object _lock = new();
     private System.Threading.Timer? _debounce;
+    private bool _disposed;
 
     public event Action<CellsFile>? Changed;
     public event Action<string>? Rejected;
@@ -94,13 +95,25 @@ public sealed class ConfigStore : IDisposable
         }
     }
 
-    /// <summary>Un éditeur écrit en plusieurs fois : on attend 300 ms de calme avant de relire.</summary>
+    /// <summary>Un éditeur écrit en plusieurs fois : on attend 300 ms de calme avant de relire. Le verrou couvre
+    /// aussi la vérification de <c>_disposed</c> : après Dispose(), plus aucun rechargement ne part, même si un
+    /// événement du watcher ou une minuterie en vol arrive juste après.</summary>
     private void Bump()
     {
         lock (_lock)
         {
-            _debounce ??= new System.Threading.Timer(_ => Load(), null, Timeout.Infinite, Timeout.Infinite);
+            if (_disposed) return;
+            _debounce ??= new System.Threading.Timer(OnDebounce, null, Timeout.Infinite, Timeout.Infinite);
             _debounce.Change(300, Timeout.Infinite);
+        }
+    }
+
+    private void OnDebounce(object? state)
+    {
+        lock (_lock)
+        {
+            if (_disposed) return;
+            Load();
         }
     }
 
@@ -124,8 +137,13 @@ public sealed class ConfigStore : IDisposable
 
     public void Dispose()
     {
-        foreach (var w in _watchers) w.Dispose();
-        _watchers.Clear();
-        _debounce?.Dispose();
+        lock (_lock)
+        {
+            _disposed = true;
+            foreach (var w in _watchers) w.Dispose();
+            _watchers.Clear();
+            _debounce?.Dispose();
+            _debounce = null;
+        }
     }
 }

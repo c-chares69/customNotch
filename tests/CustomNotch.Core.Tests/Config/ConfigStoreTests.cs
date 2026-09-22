@@ -87,4 +87,18 @@ public class ConfigStoreTests : IDisposable
         var result = await changed.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal("only", result.Pills[0].Id);
     }
+
+    [Fact]
+    public async Task Dispose_pendant_une_ecriture_ne_plante_pas()
+    {
+        var store = new ConfigStore(_home, Known);
+        store.Load();
+        store.StartWatching();
+        File.WriteAllText(store.CellsPath, """{"pills":[{"id":"only","cells":[]}]}""");
+        store.Dispose();
+        var changedAfterDispose = false;
+        store.Changed += _ => changedAfterDispose = true;
+        await Task.Delay(500);
+        Assert.False(changedAfterDispose);
+    }
 }
