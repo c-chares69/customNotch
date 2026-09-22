@@ -31,7 +31,9 @@ public static class CellViews
     }
 
     /// <summary>L'ordre de décision : les enfants font toujours un groupe (la carte hover liste ses enfants, même
-    /// si un kind a été forcé par erreur), sinon le kind explicite de la config, sinon la déduction depuis la lecture.</summary>
+    /// si un kind a été forcé par erreur), sinon le kind explicite de la config, sinon la déduction depuis la
+    /// lecture. Un maximum fait un anneau même avec un historique (l'anneau l'emporte) ; la sparkline est pour ce
+    /// qui n'a pas de maximum mais garde un historique (réseau, par exemple).</summary>
     public static CellKind DeriveKind(CellConfig cell, Reading r)
     {
         if (cell.IsGroup) return CellKind.Group;
@@ -43,8 +45,8 @@ public static class CellViews
             case "sparkline": return CellKind.Sparkline;
             case "group": return CellKind.Group;
         }
-        if (r.History is { Count: > 1 }) return CellKind.Sparkline;
         if (r.Max is not null && r.Value is not null) return CellKind.Ring;
+        if (r.History is { Count: > 1 }) return CellKind.Sparkline;
         if (r.Value is not null) return CellKind.Value;
         return CellKind.Status;
     }

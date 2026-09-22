@@ -17,6 +17,10 @@ public class CellViewTests
         => Assert.Equal(CellKind.Sparkline, CellViews.DeriveKind(Cell(), new Reading(Value: 3, History: new[] { (1L, 1.0), (2L, 3.0) })));
 
     [Fact]
+    public void Avec_un_maximum_l_anneau_l_emporte_sur_l_historique()
+        => Assert.Equal(CellKind.Ring, CellViews.DeriveKind(Cell(), new Reading(Value: 30, Max: 100, History: new[] { (1L, 1.0), (2L, 3.0) })));
+
+    [Fact]
     public void Une_valeur_seule_donne_une_valeur()
         => Assert.Equal(CellKind.Value, CellViews.DeriveKind(Cell(), new Reading(Value: 42, Unit: "°C")));
 
