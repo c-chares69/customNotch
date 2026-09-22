@@ -1,0 +1,125 @@
+{
+  // customNotch — exemple de cells.json, entièrement commenté.
+  // Ce fichier est "portable" : aucun chemin de machine, aucun secret en clair.
+  // Placeholders résolus au chargement : ${env:NOM}, ${secret:nom}, ${home}.
+  // Ce que l'app décide seule (position après un glisser, écran, visibilité) va dans la
+  // surcharge locale cells.<machine>.json, à côté de celui-ci — jamais ici.
+  "version": 1,
+  "pills": [
+    {
+      "id": "main",                    // identifiant unique de la pilule (aussi la clé dans la surcharge locale)
+      "edge": "right",                 // left | right | top | bottom
+      "along": 0.5,                    // position le long du bord : 0 = haut/gauche, 1 = bas/droite
+      // "screen": "\\\\.\\DISPLAY2",  // nom d'écran (DeviceName Windows) ; absent = écran principal
+      "scale": 1.0,                    // échelle de la pilule, entre 0.5 et 3
+      "visible": true,
+      "cells": [
+        {
+          // Une cellule-groupe : "children" présent fait toujours un groupe, même si "kind" est
+          // posé par erreur ailleurs. Son anneau, dans la pilule, montre l'enfant "headline" ;
+          // sa carte, au survol, liste tous les enfants avec leur légende et leurs actions.
+          "id": "systeme",
+          "label": "Système",
+          "glyph": "cpu",               // nom d'un glyph connu (docs/ARCHITECTURE.md §6), ou un tracé SVG "M…"
+          "children": ["cpu", "mem", "disk", "net"],
+          "headline": "cpu",            // doit être l'un des enfants ; par défaut : le pire statut des enfants
+          "visible": true
+        },
+        {
+          "id": "cpu",
+          "source": "system.cpu",       // pas de "params" : cette source n'en prend aucun
+          "label": "CPU",
+          "glyph": "cpu",
+          "refresh": "2s",              // cadence : "500ms", "2s", "5m", "1h" ; absent = cadence par défaut de la source
+          "visible": false              // masquée dans la pilule : n'apparaît que dans la carte du groupe "systeme"
+        },
+        {
+          "id": "mem",
+          "source": "system.memory",
+          "label": "Mémoire",
+          "glyph": "memory",
+          "refresh": "5s",
+          "visible": false
+        },
+        {
+          "id": "disk",
+          "source": "system.disk",
+          "label": "Disque",
+          "glyph": "disk",
+          "refresh": "1m",
+          "params": { "drive": "C:" },  // params : propres à chaque source (voir le tableau du README)
+          "visible": false
+        },
+        {
+          "id": "net",
+          "source": "system.network",
+          "label": "Réseau",
+          "glyph": "network",
+          "refresh": "2s",
+          // "params": { "iface": "Ethernet" },  // vide (ou absent) = toutes les interfaces actives
+          "visible": false
+        },
+        {
+          // En attendant la source "clickup" du plan 2 (endpoint local de ClickUp-Extended) :
+          // un simple lanceur, comme n'importe quel raccourci de barre des tâches.
+          "id": "clickup",
+          "source": "launcher",
+          "label": "ClickUp",
+          "glyph": "link",
+          "params": {
+            "open": "https://app.clickup.com"   // URL, chemin de fichier, ou application
+          }
+        }
+        // Exemple de source "http" (désactivé : décommenter et adapter l'URL et le chemin).
+        // Compte les "stargazers" d'un dépôt GitHub via son API publique, avec un jeton
+        // d'autorisation lu dans secrets.json (jamais en clair ici) :
+        // {
+        //   "id": "stars",
+        //   "source": "http",
+        //   "label": "Étoiles",
+        //   "glyph": "globe",
+        //   "refresh": "10m",
+        //   "thresholds": { "warn": 500, "crit": 1000 },  // sur la valeur (pas de "max" ici => pas d'anneau)
+        //   "params": {
+        //     "url": "https://api.github.com/repos/vinzdg/codenotch",
+        //     "method": "GET",
+        //     "path": "stargazers_count",   // chemin JSON de la valeur : "data.count" ou "items[0].n"
+        //     "unit": "★",
+        //     "headers": {
+        //       "Authorization": "Bearer ${secret:github}"   // lu dans secrets.json (DPAPI), jamais synchronisé
+        //     }
+        //   }
+        // }
+      ]
+    },
+    {
+      // Une seconde pilule, sur un autre bord : chaque pilule est indépendante (bord, écran, cellules).
+      "id": "bottom",
+      "edge": "bottom",
+      "along": 0.5,
+      "cells": [
+        {
+          // La source "shell" : l'échappatoire universelle, une commande dont la sortie devient
+          // la valeur de la cellule. Ici, un exemple qui ne dépend de rien sur la machine.
+          "id": "exemple",
+          "source": "shell",
+          "label": "Exemple",
+          "glyph": "terminal",
+          "refresh": "1m",
+          "params": {
+            "command": "echo 42",   // exécutée par cmd.exe /c ; jamais depuis le serveur des hooks (plan 2)
+            "parse": "number",      // number | json | text — comment lire la sortie
+            "unit": "u"             // unité affichée après la valeur
+          }
+        },
+        {
+          "id": "battery",
+          "source": "system.battery",  // pas de "params" : cette source n'en prend aucun
+          "label": "Batterie",
+          "glyph": "battery"
+        }
+      ]
+    }
+  ]
+  // "sources": { "http": { "headers": { "User-Agent": "customNotch" } } }  // réglages globaux, par type de source
+}
