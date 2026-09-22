@@ -35,6 +35,7 @@ customNotch/
 ├── CustomNotch.sln, Directory.Build.props, global.json
 ├── src/
 │   ├── CustomNotch.Core/              # le cœur : sans interface, sans dépendance Windows (sauf Platform/)
+│   │   ├── CustomNotch.Core.csproj    # cible net10.0 nu : doit rester portable, aucune dépendance Windows
 │   │   ├── App.cs                     # identité : nom, AppUserModelID, version (Directory.Build.props), variable de dossier de données
 │   │   ├── Paths.cs                   # dossier de données : CUSTOMNOTCH_HOME, mode portable, %APPDATA%, chemins des trois fichiers
 │   │   ├── Json.cs                    # mise en forme JSON commune, écriture atomique (tmp + remplacement, réessais)
@@ -80,6 +81,7 @@ customNotch/
 │   │       ├── SingleInstance.cs      # port local dérivé du dossier de données : verrou + canal (show, ping)
 │   │       └── SystemInfo.cs          # les appels Win32 bruts : temps CPU, mémoire, alimentation
 │   ├── CustomNotch.App/               # l'application WPF (+ WinForms pour NotifyIcon/Screen seulement)
+│   │   ├── CustomNotch.App.csproj     # cible net10.0-windows10.0.19041.0, WPF + WinForms (NotifyIcon/Screen), AllowUnsafeBlocks (LibraryImport)
 │   │   ├── app.manifest               # DPI par moniteur
 │   │   ├── App.xaml / App.xaml.cs     # styles globaux, ligne de commande (--version, --home), instance unique, exception non gérée
 │   │   ├── Controller.cs              # assemblage et cycle de vie : config → ordonnanceur → pilules, tray, tic d'une seconde
@@ -111,6 +113,7 @@ customNotch/
 │   │       ├── Theme.cs               # palettes claire/sombre, accent système, chrome de fenêtre sombre
 │   │       └── Ui.cs                  # les briques communes : pastille, bouton, ligne de formulaire (pour Settings, plan 2)
 │   └── CustomNotch.Hook/
+│       ├── CustomNotch.Hook.csproj    # console minimale, net10.0, InvariantGlobalization : doit démarrer en moins de 100 ms
 │       └── Program.cs                 # placeholder (`return 0;`) : le client des hooks Claude Code vient au plan 2
 ├── tests/
 │   ├── CustomNotch.Core.Tests/        # xUnit : configuration, modèle, sources, chemins — tout sans écran
