@@ -5,8 +5,16 @@ namespace CustomNotch.Core.Sources.System;
 
 public sealed class CpuSource : SourceBase
 {
-    private (ulong Idle, ulong Kernel, ulong User)? _previous;
-    private readonly Queue<(long, double)> _history = new();
+    private sealed class State
+    {
+        public (ulong Idle, ulong Kernel, ulong User)? Previous;
+        public readonly Queue<(long, double)> History = new();
+    }
+
+    // Une instance de la source sert toutes les cellules de ce type : l'état (delta CPU, historique)
+    // doit donc être gardé par cellule, pas dans des champs d'instance partagés entre elles.
+    private readonly Dictionary<string, State> _cells = new();
+    private readonly object _lock = new();
 
     public override string Type => "system.cpu";
     public override SourceSchema Schema => new(Type, "Processeur", Array.Empty<SchemaField>(), "cpu");
@@ -15,12 +23,19 @@ public sealed class CpuSource : SourceBase
     public override Task<Reading> ReadAsync(CellContext ctx, CancellationToken ct)
     {
         var now = SystemInfo.CpuTimes() ?? throw new InvalidOperationException("Temps CPU indisponibles sur ce système.");
-        var percent = _previous is { } prev ? Units.CpuPercent(prev, now) : 0;
-        _previous = now;
-        History.Keep(_history, percent, 60);
+        List<(long, double)> history;
+        double percent;
+        lock (_lock)
+        {
+            if (!_cells.TryGetValue(ctx.CellId, out var state)) _cells[ctx.CellId] = state = new State();
+            percent = state.Previous is { } prev ? Units.CpuPercent(prev, now) : 0;
+            state.Previous = now;
+            History.Keep(state.History, percent, 60);
+            history = state.History.ToList();
+        }
         return Task.FromResult(new Reading(Value: Math.Round(percent), Max: 100, Unit: "%",
             Detail: new[] { new DetailRow("Occupation", $"{Math.Round(percent)} %", percent / 100) },
-            History: _history.ToList()));
+            History: history));
     }
 }
 

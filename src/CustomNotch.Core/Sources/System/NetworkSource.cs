@@ -5,8 +5,16 @@ namespace CustomNotch.Core.Sources.System;
 
 public sealed class NetworkSource : SourceBase
 {
-    private (long Ms, ulong Rx, ulong Tx)? _previous;
-    private readonly Queue<(long, double)> _history = new();
+    private sealed class State
+    {
+        public (long Ms, ulong Rx, ulong Tx)? Previous;
+        public readonly Queue<(long, double)> History = new();
+    }
+
+    // Une instance de la source sert toutes les cellules de ce type : l'état (delta réseau, historique)
+    // doit donc être gardé par cellule, pas dans des champs d'instance partagés entre elles.
+    private readonly Dictionary<string, State> _cells = new();
+    private readonly object _lock = new();
 
     public override string Type => "system.network";
     public override SourceSchema Schema => new(Type, "Réseau", new[] { new SchemaField("iface", "string", "Interface", Help: "Vide = toutes") }, "network");
@@ -25,22 +33,25 @@ public sealed class NetworkSource : SourceBase
             tx += (ulong)stats.BytesSent;
         }
         var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        var (down, up) = (0.0, 0.0);
-        var unit = "Ko/s";
-        if (_previous is { } p && now > p.Ms)
+        lock (_lock)
         {
-            var seconds = (now - p.Ms) / 1000.0;
-            var d = Units.Rate(rx >= p.Rx ? rx - p.Rx : 0, seconds);
-            var u = Units.Rate(tx >= p.Tx ? tx - p.Tx : 0, seconds);
-            var total = Units.Rate((rx >= p.Rx ? rx - p.Rx : 0) + (tx >= p.Tx ? tx - p.Tx : 0), seconds);
-            (down, up, unit) = (d.Value, u.Value, total.Unit);
-            History.Keep(_history, total.Value * (total.Unit == "Mo/s" ? 1024 : 1), 60);
-            _previous = (now, rx, tx);
-            return Task.FromResult(new Reading(Value: total.Value, Unit: unit,
-                Detail: new[] { new DetailRow("↓ Réception", $"{d.Value} {d.Unit}"), new DetailRow("↑ Émission", $"{u.Value} {u.Unit}") },
-                History: _history.ToList()));
+            if (!_cells.TryGetValue(ctx.CellId, out var state)) _cells[ctx.CellId] = state = new State();
+            if (state.Previous is { } p && now > p.Ms)
+            {
+                var seconds = (now - p.Ms) / 1000.0;
+                var deltaRx = rx >= p.Rx ? rx - p.Rx : 0;
+                var deltaTx = tx >= p.Tx ? tx - p.Tx : 0;
+                var d = Units.Rate(deltaRx, seconds);
+                var u = Units.Rate(deltaTx, seconds);
+                var total = Units.Rate(deltaRx + deltaTx, seconds);
+                History.Keep(state.History, total.Value * (total.Unit == "Mo/s" ? 1024 : 1), 60);
+                state.Previous = (now, rx, tx);
+                return Task.FromResult(new Reading(Value: total.Value, Unit: total.Unit,
+                    Detail: new[] { new DetailRow("↓ Réception", $"{d.Value} {d.Unit}"), new DetailRow("↑ Émission", $"{u.Value} {u.Unit}") },
+                    History: state.History.ToList()));
+            }
+            state.Previous = (now, rx, tx);
+            return Task.FromResult(new Reading(Value: 0, Unit: "Ko/s", History: state.History.ToList()));
         }
-        _previous = (now, rx, tx);
-        return Task.FromResult(new Reading(Value: 0, Unit: unit, History: _history.ToList()));
     }
 }

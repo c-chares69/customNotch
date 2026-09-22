@@ -21,6 +21,22 @@ public class SystemSourcesTests
     }
 
     [Fact]
+    public async Task Deux_cellules_cpu_gardent_leur_propre_historique()
+    {
+        var src = new CpuSource();
+        var a = new CellContext("a", JsonNode.Parse("{}")!.AsObject(), null);
+        var b = new CellContext("b", JsonNode.Parse("{}")!.AsObject(), null);
+        await src.ReadAsync(a, CancellationToken.None);
+        await Task.Delay(50);
+        await src.ReadAsync(a, CancellationToken.None);
+        await Task.Delay(50);
+        var ra = await src.ReadAsync(a, CancellationToken.None);
+        var rb = await src.ReadAsync(b, CancellationToken.None);
+        Assert.True(rb.History is null || rb.History!.Count <= 1);
+        Assert.True(ra.History!.Count >= 2);
+    }
+
+    [Fact]
     public async Task La_memoire_donne_utilise_sur_total_en_go()
     {
         var r = await new MemorySource().ReadAsync(Ctx(), CancellationToken.None);
@@ -48,6 +64,22 @@ public class SystemSourcesTests
         Assert.NotNull(r.Value);
         Assert.Contains(r.Unit, new[] { "Ko/s", "Mo/s" });
         Assert.NotEmpty(r.History!);
+    }
+
+    [Fact]
+    public async Task Deux_cellules_reseau_gardent_leur_propre_historique()
+    {
+        var src = new NetworkSource();
+        var a = new CellContext("a", JsonNode.Parse("{}")!.AsObject(), null);
+        var b = new CellContext("b", JsonNode.Parse("{}")!.AsObject(), null);
+        await src.ReadAsync(a, CancellationToken.None);
+        await Task.Delay(50);
+        await src.ReadAsync(a, CancellationToken.None);
+        await Task.Delay(50);
+        var ra = await src.ReadAsync(a, CancellationToken.None);
+        var rb = await src.ReadAsync(b, CancellationToken.None);
+        Assert.True(rb.History is null || rb.History!.Count <= 1);
+        Assert.True(ra.History!.Count >= 2);
     }
 
     [Fact]
