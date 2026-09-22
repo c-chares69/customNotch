@@ -40,6 +40,15 @@ public class ConfigMergeTests
     }
 
     [Fact]
+    public void Un_id_non_texte_dans_la_surcharge_est_ignore()
+    {
+        var shared = O("""{"pills":[{"id":"p","along":0.5}]}""");
+        var local = O("""{"pills":[{"id":2,"along":0.9}]}""");
+        var merged = ConfigMerge.Merge(shared, local);
+        Assert.Equal(0.5, merged["pills"]![0]!["along"]!.GetValue<double>());
+    }
+
+    [Fact]
     public void Sans_surcharge_le_document_est_rendu_tel_quel()
     {
         var shared = O("""{"version":1,"pills":[]}""");

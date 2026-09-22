@@ -19,6 +19,9 @@ public sealed class Scheduler : IDisposable
         public required ISource Source;
         public required CellContext Context;
         public required TimeSpan Refresh;
+        /// <summary>Les réglages globaux (cells.json → "sources") tels qu'ils étaient à la création de la boucle :
+        /// gardés pour que la signature détecte un changement même quand la cellule elle-même n'a pas bougé.</summary>
+        public required JsonObject? GlobalsAtStart;
         public readonly CancellationTokenSource Stop = new();
         public readonly SemaphoreSlim Wake = new(0);
         public int Failures;
@@ -52,7 +55,7 @@ public sealed class Scheduler : IDisposable
         {
             _globals = file.Sources;
             var wanted = file.AllCells().Where(c => !c.IsGroup).ToDictionary(c => c.Id);
-            foreach (var id in _loops.Keys.Where(id => !wanted.ContainsKey(id) || Signature(wanted[id]) != Signature(_loops[id].Cell)).ToList())
+            foreach (var id in _loops.Keys.Where(id => !wanted.ContainsKey(id) || Signature(wanted[id], _globals) != Signature(_loops[id].Cell, _loops[id].GlobalsAtStart)).ToList())
             {
                 _loops[id].Stop.Cancel();
                 _loops.Remove(id);
@@ -67,6 +70,7 @@ public sealed class Scheduler : IDisposable
                     Cell = cell, Source = source,
                     Context = new CellContext(cell.Id, cell.Params ?? new JsonObject(), _globals?[cell.Source] as JsonObject),
                     Refresh = cell.RefreshSpan() ?? source.DefaultRefresh,
+                    GlobalsAtStart = _globals,
                 };
                 loop.Task = Task.Run(() => RunAsync(loop));
                 _loops[cell.Id] = loop;
@@ -74,7 +78,9 @@ public sealed class Scheduler : IDisposable
         }
     }
 
-    private static string Signature(CellConfig c) => $"{c.Source}|{c.Refresh}|{c.Params?.ToJsonString()}";
+    /// <summary>Inclut les réglages globaux de la source de la cellule : un changement de cells.json → "sources"
+    /// (endpoint, dossier…) sans que la cellule elle-même ne bouge doit quand même redémarrer sa boucle.</summary>
+    private static string Signature(CellConfig c, JsonObject? globals) => $"{c.Source}|{c.Refresh}|{c.Params?.ToJsonString()}|{globals?[c.Source]?.ToJsonString()}";
 
     private async Task RunAsync(Loop loop)
     {

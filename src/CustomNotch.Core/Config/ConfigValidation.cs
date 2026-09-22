@@ -37,6 +37,46 @@ public static class ConfigValidation
                 if (!cellIds.Contains(child)) errors.Add($"cellule « {cell.Id} » : enfant « {child} » introuvable");
             if (cell.Headline is { } h && !cell.Children!.Contains(h)) errors.Add($"cellule « {cell.Id} » : headline « {h} » n'est pas un enfant");
         }
+        DetectCycles(file, errors);
         return errors;
+    }
+
+    /// <summary>Un groupe qui se contient (directement ou via d'autres groupes) ferait boucler tout code qui
+    /// descend l'arbre des enfants (rendu de la carte, résolution des lectures) : sans cette garde, une config
+    /// mal formée plante le processus entier (StackOverflow) au lieu d'être refusée proprement.</summary>
+    private static void DetectCycles(CellsFile file, List<string> errors)
+    {
+        var groups = file.AllCells().Where(c => c.IsGroup).ToDictionary(c => c.Id);
+        var visited = new HashSet<string>();
+        var onStack = new HashSet<string>();
+        var stack = new List<string>();
+        foreach (var id in groups.Keys)
+            if (!visited.Contains(id)) Walk(id, groups, visited, onStack, stack, errors);
+    }
+
+    private static void Walk(string id, Dictionary<string, CellConfig> groups, HashSet<string> visited, HashSet<string> onStack, List<string> stack, List<string> errors)
+    {
+        visited.Add(id);
+        onStack.Add(id);
+        stack.Add(id);
+        if (groups.TryGetValue(id, out var cell))
+        {
+            foreach (var child in cell.Children!)
+            {
+                if (!groups.ContainsKey(child)) continue;   // seul un groupe peut refermer une boucle
+                if (onStack.Contains(child))
+                {
+                    var from = stack.IndexOf(child);
+                    var path = string.Join(" → ", stack.Skip(from).Append(child));
+                    errors.Add($"cellule « {child} » : boucle dans children ({path})");
+                }
+                else if (!visited.Contains(child))
+                {
+                    Walk(child, groups, visited, onStack, stack, errors);
+                }
+            }
+        }
+        stack.RemoveAt(stack.Count - 1);
+        onStack.Remove(id);
     }
 }

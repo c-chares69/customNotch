@@ -29,8 +29,9 @@ public static class ConfigMerge
     {
         foreach (var item in overlay.OfType<JsonObject>())
         {
-            var id = item["id"]?.GetValue<string>();
-            if (id is null) continue;
+            // « id » doit être une chaîne pour désigner une pilule ou une cellule ; un id d'un autre type
+            // (nombre, objet…) dans la surcharge locale est ignoré plutôt que de faire planter GetValue<string>().
+            if (item["id"] is not JsonValue v || !v.TryGetValue<string>(out var id)) continue;
             var existing = target.OfType<JsonObject>().FirstOrDefault(x => x["id"]?.GetValue<string>() == id);
             if (existing is not null) MergeObject(existing, item);
         }

@@ -54,8 +54,12 @@ public sealed class ConfigStore : IDisposable
                 var shared = CellsJson.Parse(File.ReadAllText(CellsPath));
                 var local = File.Exists(LocalPath) ? CellsJson.Parse(File.ReadAllText(LocalPath)) : null;
                 var merged = ConfigMerge.Merge(shared, local);
-                var (resolved, missing) = Placeholders.Resolve(merged, Environment.GetEnvironmentVariable, Secrets, _home);
+                var (resolved, missing, secretValues) = Placeholders.Resolve(merged, Environment.GetEnvironmentVariable, Secrets, _home);
                 foreach (var m in missing) Log.Warning("config", $"placeholder ${{{m}}} sans valeur");
+                // Un secret résolu (jeton ClickUp, clé API…) peut finir dans une cible « open » ou une commande
+                // « shell » journalisée telle quelle : on l'enregistre ici pour qu'il soit caviardé partout, pas
+                // seulement dans les formes que Log.Redact reconnaît déjà (Bearer, pk_, sk-, ya29).
+                Log.Mask(secretValues);
                 var file = CellsJson.ToFile(resolved!.AsObject());
                 var errors = ConfigValidation.Validate(file, _knownSources);
                 LastErrors = errors;
@@ -70,8 +74,12 @@ public sealed class ConfigStore : IDisposable
                 Changed?.Invoke(file);
                 return true;
             }
-            catch (Exception ex) when (ex is ConfigException or IOException or UnauthorizedAccessException)
+            catch (Exception ex)
             {
+                // Ici est la frontière de la configuration : quelle que soit la façon dont un fichier malformé
+                // ou un placeholder tordu fait tomber la lecture, on refuse en bloc, on journalise, et la
+                // précédente config reste en service - jamais une exception qui remonte jusqu'au thread du
+                // FileSystemWatcher ou du minuteur de rebond et tue le processus.
                 LastErrors = new[] { ex.Message };
                 Log.Warning("config", ex.Message);
                 Rejected?.Invoke(ex.Message);
@@ -113,7 +121,14 @@ public sealed class ConfigStore : IDisposable
         lock (_lock)
         {
             if (_disposed) return;
-            Load();
+            try { Load(); }
+            catch (Exception ex)
+            {
+                // OnDebounce tourne sur le thread du System.Threading.Timer : une exception qui s'en échappe
+                // n'a personne pour l'attraper et tue le processus. Load() se protège déjà elle-même, mais ce
+                // filet reste pour tout ce qui pourrait s'ajouter ici plus tard.
+                Log.Error("config", $"rechargement (minuterie) : {ex.Message}");
+            }
         }
     }
 

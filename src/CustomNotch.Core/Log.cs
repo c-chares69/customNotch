@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -13,6 +14,11 @@ public static partial class Log
     private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
     private static string? _dir;
 
+    /// <summary>Les valeurs de secrets résolus (${secret:…}) à caviarder littéralement : les motifs Bearer/pk_/sk-/
+    /// ya29 de <see cref="Token"/> ne couvrent que des formes connues, alors qu'un secret résolu peut apparaître
+    /// tel quel (target d'un « open », commande d'un « shell ») sans porter aucun de ces préfixes.</summary>
+    private static readonly ConcurrentDictionary<string, byte> Secrets = new();
+
     /// <summary>Le dossier des journaux ; null = pas d'écriture sur le disque (tests).</summary>
     public static string? Directory
     {
@@ -25,8 +31,20 @@ public static partial class Log
     [GeneratedRegex(@"(Bearer\s+|pk_|sk-|ya29\.)([A-Za-z0-9_\-\.]{6})[A-Za-z0-9_\-\.]+")]
     private static partial Regex Token();
 
+    /// <summary>Enregistre des valeurs de secrets à masquer dans tout ce qui est journalisé ensuite (appelé après
+    /// chaque résolution de config). Les valeurs trop courtes (&lt; 4 caractères) sont ignorées : les masquer
+    /// caviarderait des bouts de texte ordinaires sans protéger grand-chose.</summary>
+    public static void Mask(IEnumerable<string> secrets)
+    {
+        foreach (var s in secrets)
+            if (!string.IsNullOrEmpty(s) && s.Length >= 4)
+                Secrets[s] = 0;
+    }
+
     public static string Redact(string text)
     {
+        foreach (var secret in Secrets.Keys)
+            text = text.Replace(secret, "…");
         return Token().Replace(text, "$1$2…");
     }
 

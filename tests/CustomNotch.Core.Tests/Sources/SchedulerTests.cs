@@ -12,12 +12,16 @@ public class SchedulerTests
         public int Reads;
         public Func<Reading>? Produce;
         public string? LastAction;
+        /// <summary>La dernière valeur vue de globals["x"], pour vérifier qu'un changement de réglage global
+        /// atteint bien la source par un nouveau CellContext.</summary>
+        public double? LastGlobalX;
         public override string Type => "fake";
         public override SourceSchema Schema => new("fake", "Fake", Array.Empty<SchemaField>());
         public override TimeSpan DefaultRefresh => TimeSpan.FromMilliseconds(50);
         public override Task<Reading> ReadAsync(CellContext ctx, CancellationToken ct)
         {
             Interlocked.Increment(ref Reads);
+            LastGlobalX = ctx.Globals?["x"]?.GetValue<double>();
             return Task.FromResult(Produce?.Invoke() ?? new Reading(Value: Reads));
         }
         public override Task InvokeAsync(string action, CellContext ctx, CancellationToken ct) { LastAction = action; return Task.CompletedTask; }
@@ -175,6 +179,26 @@ public class SchedulerTests
             scheduler.Apply(File("a"));
             await scheduler.InvokeAsync("a", "toggle");
             Assert.Equal("toggle", source.LastAction);
+        }
+    }
+
+    /// <summary>cells.json → "sources": { "fake": { … } } est un réglage global : même quand la cellule elle-même
+    /// n'a pas changé, une nouvelle valeur doit redémarrer sa boucle et atteindre la source par un CellContext.</summary>
+    [Fact]
+    public async Task Un_changement_de_reglage_global_redemarre_la_boucle()
+    {
+        var (scheduler, source, _) = Make();
+        using (scheduler)
+        {
+            var cells = new CellsFile { Pills = { new PillConfig { Id = "p", Cells = { new CellConfig { Id = "a", Source = "fake" } } } } };
+            cells.Sources = JsonNode.Parse("""{"fake":{"x":1}}""")!.AsObject();
+            scheduler.Apply(cells);
+            await Task.Delay(100);
+            Assert.Equal(1, source.LastGlobalX);
+            cells.Sources = JsonNode.Parse("""{"fake":{"x":2}}""")!.AsObject();
+            scheduler.Apply(cells);
+            await Task.Delay(100);
+            Assert.Equal(2, source.LastGlobalX);
         }
     }
 }

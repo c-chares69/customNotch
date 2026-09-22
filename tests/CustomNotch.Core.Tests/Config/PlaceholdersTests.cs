@@ -10,31 +10,33 @@ public class PlaceholdersTests
         public string? Get(string name) => name == "token" ? "s3cr3t" : null;
     }
 
-    private static (JsonNode?, List<string>) Run(string json)
+    private static (JsonNode?, List<string>, List<string>) Run(string json)
         => Placeholders.Resolve(JsonNode.Parse(json), n => n == "USERPROFILE" ? @"C:\Users\x" : null, new Secrets(), @"C:\home");
 
     [Fact]
     public void Env_secret_et_home_sont_remplaces_partout()
     {
-        var (node, missing) = Run("""{"a":"${env:USERPROFILE}\\bin","b":{"c":["Bearer ${secret:token}","${home}/x"]}}""");
+        var (node, missing, secretValues) = Run("""{"a":"${env:USERPROFILE}\\bin","b":{"c":["Bearer ${secret:token}","${home}/x"]}}""");
         Assert.Empty(missing);
         Assert.Equal(@"C:\Users\x\bin", node!["a"]!.GetValue<string>());
         Assert.Equal("Bearer s3cr3t", node["b"]!["c"]![0]!.GetValue<string>());
         Assert.Equal(@"C:\home/x", node["b"]!["c"]![1]!.GetValue<string>());
+        Assert.Equal(new[] { "s3cr3t" }, secretValues);
     }
 
     [Fact]
     public void Un_placeholder_inconnu_est_signale_et_laisse_vide()
     {
-        var (node, missing) = Run("""{"a":"${secret:absent}","b":"${env:NOPE}"}""");
+        var (node, missing, secretValues) = Run("""{"a":"${secret:absent}","b":"${env:NOPE}"}""");
         Assert.Equal(new[] { "secret:absent", "env:NOPE" }, missing);
         Assert.Equal("", node!["a"]!.GetValue<string>());
+        Assert.Empty(secretValues);
     }
 
     [Fact]
     public void Les_valeurs_non_texte_sont_intactes()
     {
-        var (node, _) = Run("""{"n":3,"b":true,"x":null}""");
+        var (node, _, _) = Run("""{"n":3,"b":true,"x":null}""");
         Assert.Equal(3, node!["n"]!.GetValue<int>());
         Assert.True(node["b"]!.GetValue<bool>());
         Assert.Null(node["x"]);

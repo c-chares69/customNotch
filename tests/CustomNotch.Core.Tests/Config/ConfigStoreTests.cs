@@ -62,6 +62,17 @@ public class ConfigStoreTests : IDisposable
     }
 
     [Fact]
+    public void Un_id_non_texte_dans_la_surcharge_est_ignore_pas_un_plantage()
+    {
+        File.WriteAllText(Path.Combine(_home, "cells.json"), """{"pills":[{"id":"p","cells":[{"id":"cpu","source":"system.cpu"}]}]}""");
+        File.WriteAllText(Paths.LocalCellsFile(_home), """{"pills":[{"id":2,"along":0.9}]}""");
+        var store = new ConfigStore(_home, Known);
+        Assert.True(store.Load());
+        Assert.Equal("p", store.Current.Pills[0].Id);
+        Assert.Equal(0.5, store.Current.Pills[0].Along);
+    }
+
+    [Fact]
     public void SetPillLocal_ecrit_dans_la_surcharge_pas_dans_le_partage()
     {
         var store = new ConfigStore(_home, Known);
@@ -94,11 +105,14 @@ public class ConfigStoreTests : IDisposable
         var store = new ConfigStore(_home, Known);
         store.Load();
         store.StartWatching();
+        // L'abonnement se fait AVANT Dispose() : si le watcher a le temps de déclencher un rechargement
+        // avant qu'on dispose, on le sait (le compteur a déjà bougé) plutôt que de passer le test à côté.
+        var changedCount = 0;
+        store.Changed += _ => changedCount++;
         File.WriteAllText(store.CellsPath, """{"pills":[{"id":"only","cells":[]}]}""");
         store.Dispose();
-        var changedAfterDispose = false;
-        store.Changed += _ => changedAfterDispose = true;
+        var countAtDispose = changedCount;
         await Task.Delay(500);
-        Assert.False(changedAfterDispose);
+        Assert.Equal(countAtDispose, changedCount);
     }
 }

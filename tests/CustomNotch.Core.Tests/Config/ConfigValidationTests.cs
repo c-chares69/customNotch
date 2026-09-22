@@ -32,6 +32,22 @@ public class ConfigValidationTests
     }
 
     [Fact]
+    public void Un_groupe_qui_se_contient_est_refuse()
+    {
+        var f = File("""{"pills":[{"id":"p","edge":"right","cells":[{"id":"g","children":["g"]}]}]}""");
+        var errors = ConfigValidation.Validate(f, Known);
+        Assert.Contains(errors, e => e.Contains("boucle dans children") && e.Contains("g → g"));
+    }
+
+    [Fact]
+    public void Deux_groupes_qui_se_contiennent_sont_refuses()
+    {
+        var f = File("""{"pills":[{"id":"p","edge":"right","cells":[{"id":"a","children":["b"]},{"id":"b","children":["a"]}]}]}""");
+        var errors = ConfigValidation.Validate(f, Known);
+        Assert.Contains(errors, e => e.Contains("boucle dans children"));
+    }
+
+    [Fact]
     public void Le_parseur_accepte_commentaires_et_virgules_finales()
     {
         var f = File("""
