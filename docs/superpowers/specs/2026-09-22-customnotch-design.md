@@ -112,8 +112,8 @@ sealed record Reading(
     long? StaleSinceMs);       // la source ne répond plus : cellule grisée + âge
 ```
 
-- **Type de rendu** : `group` si `children` (un groupe est structurel : sa carte liste ses enfants), sinon `kind` explicite, sinon `sparkline` si `History` non vide,
-  sinon `ring` si `Max`, sinon `value` si `Value`, sinon `status`.
+- **Type de rendu** : `group` si `children` (un groupe est structurel : sa carte liste ses enfants), sinon `kind` explicite, sinon `ring` si `Max` (un maximum fait un anneau,
+  même avec un historique : CPU), sinon `sparkline` si `History` non vide (réseau), sinon `value` si `Value`, sinon `status`.
 - **Statut dérivé** : si la source ne fixe pas `Status`, les `thresholds` s'appliquent à `Value/Max` (ou `Value`) ;
   `invert: true` pour les grandeurs où bas = mauvais (batterie).
 - **Couleur d'anneau** : Ok = vert, Warn = jaune, Crit = orange-rouge ; Busy = arc fin qui tourne par-dessus ;
