@@ -112,7 +112,7 @@ sealed record Reading(
     long? StaleSinceMs);       // la source ne répond plus : cellule grisée + âge
 ```
 
-- **Type de rendu** : `kind` explicite, sinon `group` si `children`, sinon `sparkline` si `History` non vide,
+- **Type de rendu** : `group` si `children` (un groupe est structurel : sa carte liste ses enfants), sinon `kind` explicite, sinon `sparkline` si `History` non vide,
   sinon `ring` si `Max`, sinon `value` si `Value`, sinon `status`.
 - **Statut dérivé** : si la source ne fixe pas `Status`, les `thresholds` s'appliquent à `Value/Max` (ou `Value`) ;
   `invert: true` pour les grandeurs où bas = mauvais (batterie).
