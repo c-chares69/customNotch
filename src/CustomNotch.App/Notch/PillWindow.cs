@@ -1,9 +1,11 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using CustomNotch.Core.Config;
 using Point = System.Windows.Point;
 using Rectangle = System.Windows.Shapes.Rectangle;
@@ -22,6 +24,9 @@ public sealed class PillWindow : Window
     private readonly StackPanel _cells = new();
     private readonly Rectangle _grip = new() { Width = 4, Height = 28, RadiusX = 2, RadiusY = 2, Fill = new SolidColorBrush(Color.FromArgb(0, 255, 255, 255)) };
     private readonly Dictionary<string, Cells.CellHost> _hosts = new();
+    private readonly HoverCard _card;
+    private readonly DispatcherTimer _open = new() { Interval = TimeSpan.FromMilliseconds(150) };
+    private Cells.CellHost? _pending;
     private PillMetrics _m;
     private Point? _dragFrom;
 
@@ -43,6 +48,10 @@ public sealed class PillWindow : Window
         _canvas.Children.Add(_shape);
         _canvas.Children.Add(_cells);
         _canvas.Children.Add(_grip);
+        _card = new HoverCard(host, _m);
+        _canvas.Children.Add(_card.Tail);
+        _canvas.Children.Add(_card);
+        _open.Tick += (_, _) => { _open.Stop(); if (_pending is { } p) OpenCard(p); };
         Content = _canvas;
         SourceInitialized += (_, _) => NoActivate();
         Loaded += (_, _) => Reposition();
@@ -229,16 +238,89 @@ public sealed class PillWindow : Window
         if (_hosts.TryGetValue(cellId, out var host) && _host.View(cellId) is { } view) host.Render(view);
         foreach (var group in Pill.Cells.Where(c => c.IsGroup && c.Children!.Contains(cellId)))
             if (_hosts.TryGetValue(group.Id, out var g) && _host.View(group.Id) is { } gv) g.Render(gv);
+        if (_card.IsOpen && _card.CellId == cellId && !_card.IsMouseOver && _hosts.TryGetValue(cellId, out var h)) OpenCard(h);
     }
 
     /// <summary>À chaque tick, seules les cellules périmées se redessinent : l'âge affiché (« il y a 3 min ») vieillit.</summary>
     public void Tick()
     {
         foreach (var (id, host) in _hosts) if (host.Last is { Stale: true } && _host.View(id) is { } v) host.Render(v);
+        if (_card.IsOpen && _card.CellId is { } cardId && _hosts.TryGetValue(cardId, out var h) && !_card.IsMouseOver) OpenCard(h);
     }
 
-    // Tâche 11 : carte hover au survol, action au clic.
-    private void OnCellHovered(Cells.CellHost h) { }
-    private void OnCellUnhovered(Cells.CellHost h) { }
-    private void OnCellClicked(Cells.CellHost h) { }
+    private void OnCellHovered(Cells.CellHost host)
+    {
+        _pending = host;
+        _card.CancelHide();
+        if (_card.IsOpen && _card.CellId != host.Cell.Id) OpenCard(host); else _open.Start();
+    }
+
+    private void OnCellUnhovered(Cells.CellHost host)
+    {
+        _open.Stop();
+        _pending = null;
+        _card.HideLater();
+    }
+
+    private async void OnCellClicked(Cells.CellHost host)
+    {
+        try
+        {
+            var click = host.Cell.Actions?.Click;
+            if (click is not null) await _host.RunActionAsync(host.Cell.Id, click);
+            else if (host.Cell.Source == "launcher") await _host.InvokeSourceAsync(host.Cell.Id, "open");
+            else OpenCard(host);
+        }
+        catch (Exception ex)
+        {
+            Core.Log.Warning("action", $"Clic sur {host.Cell.Id} : {ex.Message}");
+        }
+    }
+
+    private void OpenCard(Cells.CellHost host)
+    {
+        if (_host.View(host.Cell.Id) is not { } view) return;
+        var model = CardContent.Build(view, host.Cell, _host.Children(host.Cell));
+        _card.Show(model, host.Cell.Id);
+        _card.UpdateLayout();
+        PlaceCard(host);
+    }
+
+    /// <summary>La carte côté libre, centrée sur la cellule (bornée à la fenêtre), la queue entre les deux.</summary>
+    private void PlaceCard(Cells.CellHost host)
+    {
+        var cellCenter = host.TranslatePoint(new Point(host.ActualWidth / 2, _m.Ring / 2), _canvas);
+        var w = _card.ActualWidth > 0 ? _card.ActualWidth : _m.CardWidth;
+        var h = _card.ActualHeight > 0 ? _card.ActualHeight : 100;
+        var pillLeft = Canvas.GetLeft(_shape);
+        var pillTop = Canvas.GetTop(_shape);
+        double x, y;
+        Geometry tail;
+        switch (Pill.Edge)
+        {
+            case "right":
+                x = pillLeft - _m.CardGap - _m.Tail + 4 - w;   // la queue chevauche la carte de 4 px pour ne laisser aucun jour
+                y = Math.Clamp(cellCenter.Y - h / 2, 0, Math.Max(0, Height - h));
+                tail = Geometry.Parse(string.Create(CultureInfo.InvariantCulture, $"M{x + w - 4},{cellCenter.Y - 18} L{pillLeft - _m.CardGap},{cellCenter.Y} L{x + w - 4},{cellCenter.Y + 18} Z"));
+                break;
+            case "left":
+                x = pillLeft + _m.Width + _m.CardGap + _m.Tail - 4;
+                y = Math.Clamp(cellCenter.Y - h / 2, 0, Math.Max(0, Height - h));
+                tail = Geometry.Parse(string.Create(CultureInfo.InvariantCulture, $"M{x + 4},{cellCenter.Y - 18} L{pillLeft + _m.Width + _m.CardGap},{cellCenter.Y} L{x + 4},{cellCenter.Y + 18} Z"));
+                break;
+            case "top":
+                y = pillTop + _m.Width + _m.CardGap + _m.Tail - 4;
+                x = Math.Clamp(cellCenter.X - w / 2, 0, Math.Max(0, Width - w));
+                tail = Geometry.Parse(string.Create(CultureInfo.InvariantCulture, $"M{cellCenter.X - 18},{y + 4} L{cellCenter.X},{pillTop + _m.Width + _m.CardGap} L{cellCenter.X + 18},{y + 4} Z"));
+                break;
+            default:
+                y = pillTop - _m.CardGap - _m.Tail + 4 - h;
+                x = Math.Clamp(cellCenter.X - w / 2, 0, Math.Max(0, Width - w));
+                tail = Geometry.Parse(string.Create(CultureInfo.InvariantCulture, $"M{cellCenter.X - 18},{y + h - 4} L{cellCenter.X},{pillTop - _m.CardGap} L{cellCenter.X + 18},{y + h - 4} Z"));
+                break;
+        }
+        Canvas.SetLeft(_card, x); Canvas.SetTop(_card, y);
+        _card.Tail.Data = tail;
+        Canvas.SetLeft(_card.Tail, 0); Canvas.SetTop(_card.Tail, 0);
+    }
 }
