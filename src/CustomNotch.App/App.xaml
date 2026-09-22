@@ -4,6 +4,9 @@
              ShutdownMode="OnExplicitShutdown">
     <Application.Resources>
         <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Styles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
             <FontFamily x:Key="UiFont">Segoe UI</FontFamily>
         </ResourceDictionary>
     </Application.Resources>
