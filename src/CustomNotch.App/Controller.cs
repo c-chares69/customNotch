@@ -44,7 +44,15 @@ public sealed class Controller : IPillHost
         _tray.QuitRequested += Quit;
         _tray.ToggleAllRequested += ToggleAll;
         _tray.PillToggleRequested += TogglePill;
-        _tick.Tick += (_, _) => { foreach (var p in _pills.Values) p.Tick(); };
+        _tick.Tick += (_, _) =>
+        {
+            foreach (var (id, p) in _pills)
+            {
+                var visible = _config.Current.Pills.FirstOrDefault(x => x.Id == id)?.Visible ?? false;
+                if (visible && !_allHidden) p.SetFullScreen(FullScreenDetector.IsFullScreenOn(p.CurrentScreen));
+                p.Tick();
+            }
+        };
         _tick.Start();
         if (!_config.Load()) _tray.Notify("Configuration refusée", string.Join(" ; ", _config.LastErrors));
         _config.StartWatching();
@@ -127,8 +135,10 @@ public sealed class Controller : IPillHost
     {
         var cell = _config.Current.Cell(cellId);
         if (cell is null) return null;
+        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        if (cell.IsGroup) return CellViews.FromGroup(cell, Children(cell), now);
         var reading = _readings.Get(cellId) ?? Reading.Empty;
-        return CellViews.From(cell, reading, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        return CellViews.From(cell, reading, now);
     }
 
     public IReadOnlyList<CellView> Children(CellConfig group)

@@ -73,7 +73,7 @@ public sealed class HoverCard : Border
             }
             _stack.Children.Add(wrap);
         }
-        if (model.Note is not null) _stack.Children.Add(Text(model.Note, 11, FontWeights.Normal, Color.FromRgb(0xc8, 0xc8, 0xc8), new Thickness(0, 8, 0, 0), wrap: true));
+        if (model.Note is not null) _stack.Children.Add(Text(model.Note, 12, FontWeights.Normal, Color.FromRgb(0xc8, 0xc8, 0xc8), new Thickness(0, 8, 0, 0), wrap: true));
         Visibility = Visibility.Visible;
         Tail.Visibility = Visibility.Visible;
     }

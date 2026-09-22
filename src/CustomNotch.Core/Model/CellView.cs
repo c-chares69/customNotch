@@ -83,6 +83,28 @@ public static class CellViews
         }
     }
 
+    /// <summary>L'ordre d'alarme : ce qui réclame l'utilisateur d'abord, puis ce qui est critique, puis le travail en cours.</summary>
+    private static int Rank(Status s) => s switch
+    {
+        Status.Attention => 0, Status.Crit => 1, Status.Busy => 2, Status.Warn => 3, Status.Ok => 4, _ => 5,
+    };
+
+    /// <summary>La vue d'un groupe : l'anneau vient de l'enfant `headline` (ou, à défaut, du pire enfant s'il a
+    /// une fraction, sinon du premier enfant qui en a une, sinon du pire) ; le statut est toujours le pire des
+    /// enfants ; le groupe n'est périmé que si tous ses enfants le sont.</summary>
+    public static CellView FromGroup(CellConfig group, IReadOnlyList<CellView> children, long nowMs)
+    {
+        if (children.Count == 0)
+            return new CellView(group.Id, CellKind.Group, Status.Off, group.Label ?? group.Id, group.Glyph, null, null, false, null, Reading.Empty);
+        var worst = children.MinBy(c => Rank(c.Status))!;
+        var headline = (group.Headline is { } h ? children.FirstOrDefault(c => c.Id == h) : null)
+            ?? (worst.Fraction is not null ? worst : children.FirstOrDefault(c => c.Fraction is not null) ?? worst);
+        var stale = children.All(c => c.Stale);
+        var oldest = stale ? children.Min(c => c.Reading.StaleSinceMs ?? nowMs) : (long?)null;
+        return new CellView(group.Id, CellKind.Group, worst.Status, group.Label ?? group.Id, group.Glyph, headline.Caption, headline.Fraction, stale,
+            stale ? Age(nowMs - oldest!.Value) : null, headline.Reading);
+    }
+
     public static string Age(long ms)
     {
         var seconds = Math.Max(0, ms / 1000);

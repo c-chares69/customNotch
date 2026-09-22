@@ -105,8 +105,11 @@ public sealed class PillWindow : Window
             var left = Pill.Edge == "right" ? reserve : 0;
             Canvas.SetLeft(_shape, left); Canvas.SetTop(_shape, top);
             _cells.Orientation = Orientation.Vertical;
+            _cells.HorizontalAlignment = HorizontalAlignment.Left;
+            _cells.VerticalAlignment = VerticalAlignment.Top;
             Canvas.SetLeft(_cells, left); Canvas.SetTop(_cells, top + _m.Fillet + _m.Padding);
             _cells.Width = _m.Width;
+            _cells.Height = double.NaN;   // sinon la hauteur figée par un précédent bord horizontal ne laisse peindre que la première cellule
             _grip.Width = 4; _grip.Height = 28;
             Canvas.SetLeft(_grip, left + (Pill.Edge == "right" ? 6 : _m.Width - 10)); Canvas.SetTop(_grip, top + _m.Fillet + 4);
         }
@@ -118,8 +121,10 @@ public sealed class PillWindow : Window
             var top = Pill.Edge == "bottom" ? reserve : 0;
             Canvas.SetLeft(_shape, left); Canvas.SetTop(_shape, top);
             _cells.Orientation = Orientation.Horizontal;
+            _cells.HorizontalAlignment = HorizontalAlignment.Left;
             _cells.VerticalAlignment = VerticalAlignment.Center;
             Canvas.SetLeft(_cells, left + _m.Fillet + _m.Padding); Canvas.SetTop(_cells, top + (_m.Width - (_m.Ring + _m.Caption)) / 2);
+            _cells.Width = double.NaN;   // sinon la largeur figée par un précédent bord vertical ne laisse peindre que la première cellule
             _cells.Height = _m.Width;
             _grip.Width = 28; _grip.Height = 4;
             Canvas.SetLeft(_grip, left + _m.Fillet + 4); Canvas.SetTop(_grip, top + (Pill.Edge == "bottom" ? 6 : _m.Width - 10));
@@ -153,6 +158,21 @@ public sealed class PillWindow : Window
     {
         var all = System.Windows.Forms.Screen.AllScreens;
         return all.FirstOrDefault(s => s.DeviceName == Pill.Screen) ?? System.Windows.Forms.Screen.PrimaryScreen ?? all[0];
+    }
+
+    /// <summary>L'écran de la pilule, exposé pour que le contrôleur y teste le plein écran sans dupliquer la
+    /// résolution (nom d'écran configuré, ou principal).</summary>
+    public System.Windows.Forms.Screen CurrentScreen => Screen();
+
+    private bool _fullScreenHidden;
+
+    /// <summary>Cache la pilule tant qu'une fenêtre couvre son écran, sans toucher à la config `visible` : la
+    /// pilule réapparaît d'elle-même dès que l'écran se libère, sans passer par ApplyConfig/ToggleAll.</summary>
+    public void SetFullScreen(bool covered)
+    {
+        if (covered == _fullScreenHidden) return;
+        _fullScreenHidden = covered;
+        if (covered) Hide(); else if (Pill.Visible) Show();
     }
 
     // ---- drag le long du bord (et d'un écran à l'autre) ----------------------------------------------------------
