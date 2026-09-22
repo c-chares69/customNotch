@@ -30,6 +30,8 @@ public static class CellViews
             stale ? Age(nowMs - r.StaleSinceMs!.Value) : null, r);
     }
 
+    /// <summary>L'ordre de décision : les enfants font toujours un groupe (la carte hover liste ses enfants, même
+    /// si un kind a été forcé par erreur), sinon le kind explicite de la config, sinon la déduction depuis la lecture.</summary>
     public static CellKind DeriveKind(CellConfig cell, Reading r)
     {
         if (cell.IsGroup) return CellKind.Group;

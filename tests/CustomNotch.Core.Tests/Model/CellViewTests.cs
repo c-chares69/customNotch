@@ -32,6 +32,10 @@ public class CellViewTests
     }
 
     [Fact]
+    public void Les_enfants_l_emportent_sur_kind_explicite()
+        => Assert.Equal(CellKind.Group, CellViews.DeriveKind(new CellConfig { Id = "g", Kind = "value", Children = new List<string> { "a" } }, new Reading(Value: 1, Max: 2)));
+
+    [Fact]
     public void Le_statut_de_la_source_l_emporte_sur_les_seuils()
         => Assert.Equal(Status.Busy, CellViews.DeriveStatus(Cell(), new Reading(Value: 99, Max: 100, Status: Status.Busy)));
 
