@@ -46,10 +46,9 @@ public sealed class Controller : IPillHost
         _tray.PillToggleRequested += TogglePill;
         _tick.Tick += (_, _) =>
         {
-            foreach (var (id, p) in _pills)
+            foreach (var p in _pills.Values)
             {
-                var visible = _config.Current.Pills.FirstOrDefault(x => x.Id == id)?.Visible ?? false;
-                if (visible && !_allHidden) p.SetFullScreen(FullScreenDetector.IsFullScreenOn(p.CurrentScreen));
+                p.SetFullScreen(FullScreenDetector.IsFullScreenOn(p.CurrentScreen));
                 p.Tick();
             }
         };
@@ -76,7 +75,7 @@ public sealed class Controller : IPillHost
                 window = new PillWindow(pill, this);
                 _pills[pill.Id] = window;
             }
-            if (pill.Visible && !_allHidden) window.Show(); else window.Hide();
+            window.SetWanted(pill.Visible && !_allHidden);
         }
         _tray.SetPills(file.Pills.Select(p => (p.Id, p.Visible)));
     }
@@ -97,7 +96,7 @@ public sealed class Controller : IPillHost
         foreach (var (id, window) in _pills)
         {
             var visible = _config.Current.Pills.First(p => p.Id == id).Visible;
-            if (visible && !_allHidden) window.Show(); else window.Hide();
+            window.SetWanted(visible && !_allHidden);
         }
     }
 

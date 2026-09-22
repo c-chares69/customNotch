@@ -164,15 +164,35 @@ public sealed class PillWindow : Window
     /// résolution (nom d'écran configuré, ou principal).</summary>
     public System.Windows.Forms.Screen CurrentScreen => Screen();
 
-    private bool _fullScreenHidden;
+    // ---- visibilité : un seul propriétaire ------------------------------------------------------------------
 
-    /// <summary>Cache la pilule tant qu'une fenêtre couvre son écran, sans toucher à la config `visible` : la
-    /// pilule réapparaît d'elle-même dès que l'écran se libère, sans passer par ApplyConfig/ToggleAll.</summary>
+    private bool _wanted = true;
+    private bool _covered;
+
+    /// <summary>La visibilité a un seul propriétaire (cette classe), pas deux qui se disputent la fenêtre : un
+    /// rechargement de config (fichier modifié, tray, ToggleAll) dit ce qui est *voulu* (`SetWanted`), le
+    /// détecteur de plein écran dit ce qui est *couvert* (`SetFullScreen`), et `Refresh` seul appelle
+    /// `Show`/`Hide` en combinant les deux — sans ça, un rechargement pendant un plein écran ramenait la pilule
+    /// au premier plan par-dessus le jeu, et le tic suivant ne la recachait pas (`_fullScreenHidden` était resté
+    /// à `true` alors que la fenêtre, elle, était redevenue visible).</summary>
+    private void Refresh()
+    {
+        if (_wanted && !_covered) { if (!IsVisible) Show(); }
+        else { if (IsVisible) Hide(); }
+    }
+
+    /// <summary>Ce que la config (visible du pill, ToggleAll) demande, indépendamment de ce que le plein écran autorise.</summary>
+    public void SetWanted(bool wanted)
+    {
+        _wanted = wanted;
+        Refresh();
+    }
+
+    /// <summary>Ce que le plein écran autorise, indépendamment de ce que la config demande.</summary>
     public void SetFullScreen(bool covered)
     {
-        if (covered == _fullScreenHidden) return;
-        _fullScreenHidden = covered;
-        if (covered) Hide(); else if (Pill.Visible) Show();
+        _covered = covered;
+        Refresh();
     }
 
     // ---- drag le long du bord (et d'un écran à l'autre) ----------------------------------------------------------
