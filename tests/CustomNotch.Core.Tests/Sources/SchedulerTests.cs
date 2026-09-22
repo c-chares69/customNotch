@@ -24,6 +24,25 @@ public class SchedulerTests
         public void Fire(string id) => Push(id);
     }
 
+    /// <summary>Une source dont la première lecture traîne 300 ms sans regarder le jeton d'annulation :
+    /// de quoi vérifier qu'une boucle remplacée ne peut pas écraser la lecture de sa remplaçante.</summary>
+    private sealed class RaceSource : SourceBase
+    {
+        private int _calls;
+        public override string Type => "fake";
+        public override SourceSchema Schema => new("fake", "Fake", Array.Empty<SchemaField>());
+        public override TimeSpan DefaultRefresh => TimeSpan.FromMilliseconds(50);
+        public override async Task<Reading> ReadAsync(CellContext ctx, CancellationToken ct)
+        {
+            if (Interlocked.Increment(ref _calls) == 1)
+            {
+                await Task.Delay(300, CancellationToken.None);
+                return new Reading(Value: 1);
+            }
+            return new Reading(Value: 2);
+        }
+    }
+
     private static CellsFile File(params string[] ids) => new()
     {
         Pills = { new PillConfig { Id = "p", Cells = ids.Select(i => new CellConfig { Id = i, Source = "fake" }).ToList() } },
@@ -126,6 +145,24 @@ public class SchedulerTests
             scheduler.Apply(File("a"));
             await Task.Delay(250);
             Assert.Equal(1, source.Reads);
+        }
+    }
+
+    [Fact]
+    public async Task Une_boucle_remplacee_n_ecrase_pas_la_nouvelle_lecture()
+    {
+        var registry = new SourceRegistry();
+        var source = new RaceSource();
+        registry.Register(source);
+        var store = new ReadingStore();
+        var scheduler = new Scheduler(registry, store, () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), () => 0);
+        using (scheduler)
+        {
+            scheduler.Apply(File("a"));
+            await Task.Delay(50);
+            scheduler.Apply(new CellsFile { Pills = { new PillConfig { Id = "p", Cells = { new CellConfig { Id = "a", Source = "fake", Refresh = "1h" } } } } });
+            await Task.Delay(500);
+            Assert.Equal(2, store.Get("a")!.Value);
         }
     }
 

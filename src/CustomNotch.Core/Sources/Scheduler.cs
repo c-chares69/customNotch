@@ -33,6 +33,8 @@ public sealed class Scheduler : IDisposable
     private readonly object _lock = new();
     private JsonObject? _globals;
 
+    /// <summary>Toutes les sources doivent être enregistrées avant de construire l'ordonnanceur : c'est ici que
+    /// leur événement Pushed est câblé.</summary>
     public Scheduler(SourceRegistry registry, ReadingStore store, Func<long> nowMs, Func<long> idleMs)
     {
         _registry = registry;
@@ -77,31 +79,48 @@ public sealed class Scheduler : IDisposable
     private async Task RunAsync(Loop loop)
     {
         var ct = loop.Stop.Token;
-        while (!ct.IsCancellationRequested)
+        try
         {
-            try
+            while (!ct.IsCancellationRequested)
             {
-                var reading = await loop.Source.ReadAsync(loop.Context, ct).ConfigureAwait(false);
-                loop.Failures = 0;
-                _store.Set(loop.Cell.Id, reading.Fresh());
+                try
+                {
+                    var reading = await loop.Source.ReadAsync(loop.Context, ct).ConfigureAwait(false);
+                    // Une boucle remplacée (Apply : source, params ou cadence changés) est annulée avant que
+                    // sa lecture en cours ne revienne. Si la source ignore le jeton, cette lecture périmée ne
+                    // doit pas écraser la lecture de sa remplaçante.
+                    if (ct.IsCancellationRequested) return;
+                    loop.Failures = 0;
+                    _store.Set(loop.Cell.Id, reading.Fresh());
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
+                catch (Exception ex)
+                {
+                    // Même raison : une panne rapportée après l'annulation ne doit pas écraser la lecture
+                    // de la boucle qui a remplacé celle-ci.
+                    if (ct.IsCancellationRequested) return;
+                    loop.Failures = Math.Min(loop.Failures + 1, 20);
+                    var previous = _store.Get(loop.Cell.Id) ?? Reading.Empty;
+                    _store.Set(loop.Cell.Id, previous.AsStale(_now(), ex.Message));
+                    Log.Warning("source", $"{loop.Cell.Id} ({loop.Source.Type}) : {ex.Message}");
+                }
+                var wait = loop.Refresh;
+                if (loop.Failures > 0)
+                {
+                    var factor = Math.Pow(2, loop.Failures - 1);
+                    wait = TimeSpan.FromMilliseconds(Math.Min(loop.Refresh.TotalMilliseconds * factor, BackoffCap.TotalMilliseconds));
+                }
+                if (_idleMs() > IdleAfter.TotalMilliseconds && wait < IdleFloor) wait = IdleFloor;
+                try { await loop.Wake.WaitAsync(wait, ct).ConfigureAwait(false); }
+                catch (OperationCanceledException) { return; }
             }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
-            catch (Exception ex)
-            {
-                loop.Failures = Math.Min(loop.Failures + 1, 20);
-                var previous = _store.Get(loop.Cell.Id) ?? Reading.Empty;
-                _store.Set(loop.Cell.Id, previous.AsStale(_now(), ex.Message));
-                Log.Warning("source", $"{loop.Cell.Id} ({loop.Source.Type}) : {ex.Message}");
-            }
-            var wait = loop.Refresh;
-            if (loop.Failures > 0)
-            {
-                var factor = Math.Pow(2, loop.Failures - 1);
-                wait = TimeSpan.FromMilliseconds(Math.Min(loop.Refresh.TotalMilliseconds * factor, BackoffCap.TotalMilliseconds));
-            }
-            if (_idleMs() > IdleAfter.TotalMilliseconds && wait < IdleFloor) wait = IdleFloor;
-            try { await loop.Wake.WaitAsync(wait, ct).ConfigureAwait(false); }
-            catch (OperationCanceledException) { return; }
+        }
+        finally
+        {
+            // RunAsync est seule propriétaire de ces ressources : elles ne sont plus utiles une fois la
+            // boucle arrêtée (Apply l'a remplacée, ou Dispose a tout arrêté).
+            loop.Wake.Dispose();
+            loop.Stop.Dispose();
         }
     }
 
@@ -112,7 +131,9 @@ public sealed class Scheduler : IDisposable
             if (_loops.TryGetValue(cellId, out var loop))
             {
                 loop.Failures = 0;
-                if (loop.Wake.CurrentCount == 0) loop.Wake.Release();
+                // La boucle a pu se terminer et disposer Wake entre le TryGetValue et ici.
+                try { if (loop.Wake.CurrentCount == 0) loop.Wake.Release(); }
+                catch (ObjectDisposedException) { }
             }
         }
     }
