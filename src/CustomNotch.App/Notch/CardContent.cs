@@ -4,7 +4,11 @@ using CustomNotch.Core.Model;
 namespace CustomNotch.App.Notch;
 
 public sealed record CardRow(string Label, string? Text, double? Fraction, string? Hint, Status Tone);
-public sealed record CardAction(string Label, string? Icon, ActionConfig? Config, string? SourceAction);
+/// <summary>TargetCellId n'est renseigné que pour une action d'un enfant de groupe (la cellule à invoquer n'est
+/// pas celle qui a ouvert la carte) ; sinon null, et l'appelant vise la cellule de la carte elle-même. Fini le
+/// codage « child:action » dans SourceAction, qui appliquait le découpage même quand « action » lui-même
+/// contenait un « : » (ex. une action nommée par une source).</summary>
+public sealed record CardAction(string Label, string? Icon, ActionConfig? Config, string? SourceAction, string? TargetCellId = null);
 public sealed record CardModel(string Title, string? Glyph, string? Subtitle, IReadOnlyList<CardRow> Rows, IReadOnlyList<CardAction> Actions, string? Note);
 
 /// <summary>Ce que la carte affiche, calculé sans WPF : les lignes de détail de la source (ou la valeur seule), les
@@ -22,7 +26,7 @@ public static class CardContent
                 var hint = child.Reading.Detail is { Count: > 0 } d ? d[0].Hint : null;
                 rows.Add(new CardRow(child.Label, child.Caption ?? child.Reading.Text, child.Fraction, hint, child.Status));
                 foreach (var a in child.Reading.Actions ?? Array.Empty<ActionSpec>())
-                    actions.Add(new CardAction($"{child.Label} · {a.Label}", a.Icon, null, $"{child.Id}:{a.Id}"));
+                    actions.Add(new CardAction($"{child.Label} · {a.Label}", a.Icon, null, a.Id, child.Id));
             }
         }
         else if (view.Reading.Detail is { Count: > 0 } detail)

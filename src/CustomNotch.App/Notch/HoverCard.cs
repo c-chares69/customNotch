@@ -63,11 +63,10 @@ public sealed class HoverCard : Border
                 button.Click += async (_, _) =>
                 {
                     if (a.Config is not null) await _host.RunActionAsync(cellId, a.Config);
-                    else if (a.SourceAction is { } sa)
-                    {
-                        var parts = sa.Split(':', 2);
-                        await _host.InvokeSourceAsync(parts.Length == 2 ? parts[0] : cellId, parts[^1]);
-                    }
+                    // TargetCellId n'est posé que pour l'action d'un enfant de groupe : sinon (une action de la
+                    // source de la cellule elle-même) c'est cellId qu'il faut viser, jamais un découpage de
+                    // l'id d'action lui-même (qui peut légitimement contenir « : »).
+                    else if (a.SourceAction is { } sa) await _host.InvokeSourceAsync(a.TargetCellId ?? cellId, sa);
                 };
                 wrap.Children.Add(button);
             }

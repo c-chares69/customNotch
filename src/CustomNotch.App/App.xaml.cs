@@ -36,6 +36,11 @@ public partial class App : Application
             Log.Error("app", $"Exception non gérée : {ex.Exception}");
             ex.Handled = true;
         };
+        // Hors du thread UI (une boucle de Scheduler tourne sur un Timer, une source sur un Task) : sans ces
+        // deux gardes, une exception qui s'en échappe tue le processus entier sans passer par
+        // DispatcherUnhandledException, qui ne voit que le thread UI.
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Error("app", $"Exception non gérée (hors UI) : {e.ExceptionObject}");
+        TaskScheduler.UnobservedTaskException += (_, e) => { Log.Error("app", $"Tâche non observée : {e.Exception}"); e.SetObserved(); };
         _controller = new Controller(home);
         _instance.ShowRequested += () => Dispatcher.BeginInvoke(() => _controller.ShowSettings());
         _controller.Start();

@@ -56,7 +56,14 @@ public sealed class PillWindow : Window
         SourceInitialized += (_, _) => NoActivate();
         Loaded += (_, _) => Reposition();
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplayChanged;
-        Closed += (_, _) => Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnDisplayChanged;
+        // La barre des tâches qui passe en masquage automatique (ou en revient) change l'aire de travail sans
+        // changer l'affichage : DisplaySettingsChanged ne se déclenche pas, seul UserPreferenceChanged le voit.
+        Microsoft.Win32.SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
+        Closed += (_, _) =>
+        {
+            Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnDisplayChanged;
+            Microsoft.Win32.SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
+        };
         _shape.MouseEnter += (_, _) => _grip.Fill = new SolidColorBrush(Color.FromArgb(120, 255, 255, 255));
         _shape.MouseLeave += (_, _) => { if (_dragFrom is null) _grip.Fill = new SolidColorBrush(Color.FromArgb(0, 255, 255, 255)); };
         _grip.MouseEnter += (_, _) => _grip.Fill = new SolidColorBrush(Color.FromArgb(200, 255, 255, 255));
@@ -73,6 +80,12 @@ public sealed class PillWindow : Window
     private bool Vertical => EdgePlacement.IsVertical(Pill.Edge);
 
     private void OnDisplayChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(Reposition);
+
+    private void OnUserPreferenceChanged(object? sender, Microsoft.Win32.UserPreferenceChangedEventArgs e)
+    {
+        if (e.Category is Microsoft.Win32.UserPreferenceCategory.Desktop or Microsoft.Win32.UserPreferenceCategory.General)
+            Dispatcher.BeginInvoke(Reposition);
+    }
 
     private void NoActivate()
     {

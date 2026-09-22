@@ -37,12 +37,17 @@ public class CardContentTests
     public void Un_groupe_empile_ses_enfants()
     {
         var a = View("a", new Reading(Value: 10, Max: 100), "CPU");
-        var b = View("b", new Reading(Value: 3, Unit: "Mo/s", History: new[] { (1L, 1.0), (2L, 3.0) }), "Réseau");
+        var b = View("b", new Reading(Value: 3, Unit: "Mo/s", History: new[] { (1L, 1.0), (2L, 3.0) }, Actions: new[] { new ActionSpec("toggle", "Basculer") }), "Réseau");
         var group = new CellConfig { Id = "g", Label = "Système", Children = new() { "a", "b" } };
         var model = CardContent.Build(CellViews.From(group, Reading.Empty, 0), group, new[] { a, b });
         Assert.Equal(2, model.Rows.Count);
         Assert.Equal("CPU", model.Rows[0].Label); Assert.Equal("10%", model.Rows[0].Text); Assert.Equal(0.1, model.Rows[0].Fraction);
         Assert.Equal("Réseau", model.Rows[1].Label); Assert.Equal("3 Mo/s", model.Rows[1].Text); Assert.Null(model.Rows[1].Fraction);
+        // L'action d'un enfant de groupe vise ce enfant (TargetCellId), pas la cellule qui a ouvert la carte,
+        // et l'id d'action lui-même n'est plus jamais découpé sur « : ».
+        var action = Assert.Single(model.Actions);
+        Assert.Equal("toggle", action.SourceAction);
+        Assert.Equal("b", action.TargetCellId);
     }
 
     [Fact]
