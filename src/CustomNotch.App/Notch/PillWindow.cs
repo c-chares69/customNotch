@@ -23,7 +23,6 @@ public sealed class PillWindow : Window
     private readonly Rectangle _grip = new() { Width = 4, Height = 28, RadiusX = 2, RadiusY = 2, Fill = new SolidColorBrush(Color.FromArgb(0, 255, 255, 255)) };
     private PillMetrics _m;
     private Point? _dragFrom;
-    private Rect _dragArea;
 
     public PillWindow(PillConfig pill, IPillHost host)
     {
@@ -159,25 +158,30 @@ public sealed class PillWindow : Window
         var cursor = Screens.CursorDip(this);
         var (sx, sy) = Screens.Scale(this);
         var device = new System.Drawing.Point((int)Math.Round(cursor.X * sx), (int)Math.Round(cursor.Y * sy));
-        _dragArea = Screens.WorkArea(this, device);
+        var dragArea = Screens.WorkArea(this, device);
         var extent = _m.Extent(CellCount);
         // La pilule suit le curseur le long du bord de l'écran sous la souris ; l'autre axe reste collé au bord.
         var origin = Vertical ? new Point(0, cursor.Y - from.Y + (Height - extent) / 2) : new Point(cursor.X - from.X + (Width - extent) / 2, 0);
-        var along = EdgePlacement.AlongFrom(_dragArea, Pill.Edge, origin, extent);
-        MoveTo(EdgePlacement.Place(_dragArea, Pill.Edge, along, extent, _m.Width));
+        var along = EdgePlacement.AlongFrom(dragArea, Pill.Edge, origin, extent);
+        MoveTo(EdgePlacement.Place(dragArea, Pill.Edge, along, extent, _m.Width));
     }
 
+    /// <summary>Recalcule depuis le curseur actuel, pas depuis un état laissé par OnDragMove : sans ça, un
+    /// clic-relâché sans déplacement (jamais de MouseMove) ou un survol rapide vers un autre écran juste avant
+    /// le relâché se retrouvait avec une zone ou un écran périmés (voire la zone par défaut, along=0).</summary>
     private void OnDragEnd(object sender, MouseButtonEventArgs e)
     {
         if (_dragFrom is null) return;
         _dragFrom = null;
         _grip.ReleaseMouseCapture();
+        var cursor = Screens.CursorDip(this);
+        var (sx, sy) = Screens.Scale(this);
+        var device = new System.Drawing.Point((int)Math.Round(cursor.X * sx), (int)Math.Round(cursor.Y * sy));
+        var area = Screens.WorkArea(this, device);
         var extent = _m.Extent(CellCount);
         var origin = Vertical ? new Point(0, Top + (Height - extent) / 2) : new Point(Left + (Width - extent) / 2, 0);
-        var along = EdgePlacement.AlongFrom(_dragArea, Pill.Edge, origin, extent);
-        var (sx, sy) = Screens.Scale(this);
-        var center = new System.Drawing.Point((int)Math.Round((_dragArea.X + _dragArea.Width / 2) * sx), (int)Math.Round((_dragArea.Y + _dragArea.Height / 2) * sy));
-        var screen = System.Windows.Forms.Screen.FromPoint(center).DeviceName;
+        var along = EdgePlacement.AlongFrom(area, Pill.Edge, origin, extent);
+        var screen = System.Windows.Forms.Screen.FromPoint(device).DeviceName;
         _host.SavePosition(Pill.Id, along, screen);
     }
 

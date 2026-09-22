@@ -43,4 +43,23 @@ public class EdgePlacementTests
         var r = EdgePlacement.Place(second, "right", 0, 300, 70);
         Assert.Equal(1920 + 2560 - 70, r.X); Assert.Equal(-200, r.Y);
     }
+
+    [Theory]
+    [InlineData("right", 0)]
+    [InlineData("right", 0.37)]
+    [InlineData("right", 1)]
+    [InlineData("left", 0)]
+    [InlineData("left", 0.37)]
+    [InlineData("left", 1)]
+    [InlineData("top", 0)]
+    [InlineData("top", 0.37)]
+    [InlineData("top", 1)]
+    [InlineData("bottom", 0)]
+    [InlineData("bottom", 0.37)]
+    [InlineData("bottom", 1)]
+    public void Place_et_AlongFrom_sont_inverses(string edge, double along)
+    {
+        var placed = EdgePlacement.Place(Area, edge, along, extent: 300, thickness: 70);
+        Assert.Equal(along, EdgePlacement.AlongFrom(Area, edge, placed.Location, 300), 6);
+    }
 }
