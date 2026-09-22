@@ -28,9 +28,25 @@ public sealed class HttpSource : SourceBase
         var url = ctx.Str("url") ?? throw new InvalidOperationException("url manquante");
         using var request = new HttpRequestMessage(new HttpMethod(ctx.Str("method") ?? "GET"), url);
         request.Headers.TryAddWithoutValidation("User-Agent", $"{App.Name}/{App.Version}");
-        if (ctx.Params["headers"] is JsonObject headers)
-            foreach (var (hk, hv) in headers) request.Headers.TryAddWithoutValidation(hk, hv?.ToString() ?? "");
+        // Le corps est construit avant les en-têtes : un Content-Type explicite dans « headers » doit pouvoir
+        // remplacer le « application/json » par défaut, porté par les en-têtes du contenu, pas de la requête.
         if (ctx.Str("body") is { } body) request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+        if (ctx.Params["headers"] is JsonObject headers)
+            foreach (var (hk, hv) in headers)
+            {
+                var val = hv?.ToString() ?? "";
+                // TryAddWithoutValidation rend false pour un en-tête de contenu (Content-Type…) : il vit sur
+                // request.Content.Headers, pas request.Headers - sinon la valeur est silencieusement perdue.
+                if (!request.Headers.TryAddWithoutValidation(hk, val))
+                {
+                    if (request.Content is not null)
+                    {
+                        request.Content.Headers.Remove(hk);
+                        request.Content.Headers.TryAddWithoutValidation(hk, val);
+                    }
+                    else Log.Warning("http", $"en-tête « {hk} » ignoré : pas de corps");
+                }
+            }
         using var response = await Http.SendAsync(request, ct).ConfigureAwait(false);
         var text = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"HTTP {(int)response.StatusCode}");

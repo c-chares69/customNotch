@@ -39,4 +39,11 @@ public class ShellSourceTests
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => new ShellSource().ReadAsync(Ctx("""{"command":"ping -n 6 127.0.0.1 > nul","timeoutSeconds":1}"""), CancellationToken.None));
         Assert.Contains("délai", ex.Message);
     }
+
+    [Fact]
+    public async Task Un_stderr_abondant_ne_bloque_pas()
+    {
+        var r = await new ShellSource().ReadAsync(Ctx("""{"command":"for /L %i in (1,1,3000) do @echo ligne %i 1>&2 & echo 7","parse":"number","timeoutSeconds":5}"""), CancellationToken.None);
+        Assert.Equal(7, r.Value);
+    }
 }

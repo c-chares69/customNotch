@@ -11,6 +11,7 @@ public class HttpSourceTests : IDisposable
     private readonly string _prefix;
     private string _body = "{}";
     private string? _seenAuth;
+    private string? _seenContentType;
 
     public HttpSourceTests()
     {
@@ -25,6 +26,7 @@ public class HttpSourceTests : IDisposable
                 HttpListenerContext ctx;
                 try { ctx = await _server.GetContextAsync(); } catch (Exception ex) when (ex is HttpListenerException or ObjectDisposedException) { return; }
                 _seenAuth = ctx.Request.Headers["Authorization"];
+                _seenContentType = ctx.Request.ContentType;
                 var bytes = Encoding.UTF8.GetBytes(ctx.Request.Url!.AbsolutePath == "/fail" ? "boom" : _body);
                 ctx.Response.StatusCode = ctx.Request.Url.AbsolutePath == "/fail" ? 500 : 200;
                 await ctx.Response.OutputStream.WriteAsync(bytes);
@@ -62,5 +64,13 @@ public class HttpSourceTests : IDisposable
     {
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => new HttpSource().ReadAsync(Ctx($$"""{"url":"{{_prefix}}fail"}"""), CancellationToken.None));
         Assert.Contains("500", ex.Message);
+    }
+
+    [Fact]
+    public async Task Un_en_tete_de_contenu_remplace_le_type_par_defaut()
+    {
+        _body = "{}";
+        var r = await new HttpSource().ReadAsync(Ctx($$$"""{"url":"{{{_prefix}}}","method":"POST","body":"plain text","headers":{"Content-Type":"text/plain"}}"""), CancellationToken.None);
+        Assert.StartsWith("text/plain", _seenContentType);
     }
 }

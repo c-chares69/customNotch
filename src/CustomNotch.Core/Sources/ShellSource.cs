@@ -34,7 +34,9 @@ public sealed class ShellSource : SourceBase
         using var process = Process.Start(info) ?? throw new InvalidOperationException("Impossible de lancer la commande.");
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
         deadline.CancelAfter(timeout);
+        // On lit stdout ET stderr en continu : sinon un tube plein (stderr bavard) bloque l'enfant jusqu'au délai.
         var output = process.StandardOutput.ReadToEndAsync(deadline.Token);
+        var error = process.StandardError.ReadToEndAsync(deadline.Token);
         try { await process.WaitForExitAsync(deadline.Token).ConfigureAwait(false); }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
@@ -42,7 +44,12 @@ public sealed class ShellSource : SourceBase
             throw new InvalidOperationException($"délai de {timeout.TotalSeconds} s dépassé");
         }
         var stdout = (await output.ConfigureAwait(false)).Trim();
-        if (process.ExitCode != 0) throw new InvalidOperationException($"code de sortie {process.ExitCode}");
+        var stderr = (await error.ConfigureAwait(false)).Trim();
+        if (process.ExitCode != 0)
+        {
+            var detail = stderr.Length > 200 ? stderr[..200] : stderr;
+            throw new InvalidOperationException($"code de sortie {process.ExitCode}" + (detail.Length > 0 ? $" : {detail}" : ""));
+        }
         var unit = ctx.Str("unit");
         switch ((ctx.Str("parse") ?? "number").ToLowerInvariant())
         {

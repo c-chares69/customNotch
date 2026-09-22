@@ -28,12 +28,13 @@ public static class ActionRunner
         {
             // Arguments (ligne brute), pas ArgumentList : cmd.exe ne suit pas l'échappement CRT standard des
             // arguments et double les guillemets internes (ex. un chemin entre guillemets, un JSON échoué).
+            // On ne lit rien, donc on ne redirige rien - sinon un tube plein bloquerait l'enfant.
             var info = new ProcessStartInfo(Environment.GetEnvironmentVariable("ComSpec") ?? "cmd.exe")
             {
-                UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
+                UseShellExecute = false, CreateNoWindow = true,
                 Arguments = $"/c {command}",
             };
-            Process.Start(info);
+            using var p = Process.Start(info);
             return true;
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
