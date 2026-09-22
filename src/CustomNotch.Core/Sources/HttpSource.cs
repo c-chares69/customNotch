@@ -1,0 +1,47 @@
+using System.Text;
+using System.Text.Json.Nodes;
+using CustomNotch.Core.Model;
+
+namespace CustomNotch.Core.Sources;
+
+/// <summary>Une URL, une extraction JSON, un maximum facultatif : de quoi afficher n'importe quel chiffre métier sans
+/// écrire de code. Les en-têtes portent l'auth via ${secret:…}.</summary>
+public sealed class HttpSource : SourceBase
+{
+    public static HttpClient Http { get; set; } = new() { Timeout = TimeSpan.FromSeconds(15) };
+
+    public override string Type => "http";
+    public override SourceSchema Schema => new(Type, "HTTP / JSON", new SchemaField[]
+    {
+        new("url", "url", "URL", Required: true),
+        new("method", "choice", "Méthode", Default: "GET", Choices: new[] { "GET", "POST" }),
+        new("path", "string", "Chemin JSON de la valeur", Help: "data.count ou items[0].n"),
+        new("textPath", "string", "Chemin JSON du texte"),
+        new("max", "number", "Maximum", Help: "Présent = anneau en %"),
+        new("unit", "string", "Unité"),
+        new("body", "string", "Corps (POST)"),
+    }, "globe");
+    public override TimeSpan DefaultRefresh => TimeSpan.FromMinutes(1);
+
+    public override async Task<Reading> ReadAsync(CellContext ctx, CancellationToken ct)
+    {
+        var url = ctx.Str("url") ?? throw new InvalidOperationException("url manquante");
+        using var request = new HttpRequestMessage(new HttpMethod(ctx.Str("method") ?? "GET"), url);
+        request.Headers.TryAddWithoutValidation("User-Agent", $"{App.Name}/{App.Version}");
+        if (ctx.Params["headers"] is JsonObject headers)
+            foreach (var (hk, hv) in headers) request.Headers.TryAddWithoutValidation(hk, hv?.ToString() ?? "");
+        if (ctx.Str("body") is { } body) request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+        using var response = await Http.SendAsync(request, ct).ConfigureAwait(false);
+        var text = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"HTTP {(int)response.StatusCode}");
+        JsonNode? root;
+        try { root = JsonNode.Parse(text); }
+        catch (global::System.Text.Json.JsonException) { root = JsonValue.Create(text); }
+        var valueNode = JsonPath.Select(root, ctx.Str("path") ?? "");
+        double? value = valueNode is JsonValue v && v.TryGetValue<double>(out var d) ? d
+            : double.TryParse(valueNode?.ToString(), global::System.Globalization.NumberStyles.Float, global::System.Globalization.CultureInfo.InvariantCulture, out var parsed) ? parsed : null;
+        var textValue = ctx.Str("textPath") is { } tp ? JsonPath.Select(root, tp)?.ToString() : value is null ? valueNode?.ToString() : null;
+        return new Reading(Value: value, Max: ctx.Num("max"), Unit: ctx.Str("unit"), Text: textValue,
+            Detail: new[] { new DetailRow(ctx.Str("label") ?? "Valeur", textValue ?? value?.ToString() ?? "—") });
+    }
+}
