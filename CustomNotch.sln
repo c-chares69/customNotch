@@ -15,6 +15,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CustomNotch.Core.Tests", "tests\CustomNotch.Core.Tests\CustomNotch.Core.Tests.csproj", "{6C08D071-C0BE-45CF-990C-9F1EA4B43D43}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CustomNotch.App.Tests", "tests\CustomNotch.App.Tests\CustomNotch.App.Tests.csproj", "{55826966-5C43-4223-AB20-0E8CF3021BBE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -73,6 +75,18 @@ Global
 		{6C08D071-C0BE-45CF-990C-9F1EA4B43D43}.Release|x64.Build.0 = Release|Any CPU
 		{6C08D071-C0BE-45CF-990C-9F1EA4B43D43}.Release|x86.ActiveCfg = Release|Any CPU
 		{6C08D071-C0BE-45CF-990C-9F1EA4B43D43}.Release|x86.Build.0 = Release|Any CPU
+		{55826966-5C43-4223-AB20-0E8CF3021BBE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{55826966-5C43-4223-AB20-0E8CF3021BBE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{55826966-5C43-4223-AB20-0E8CF3021BBE}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{55826966-5C43-4223-AB20-0E8CF3021BBE}.Debug|x64.Build.0 = Debug|Any CPU
+		{55826966-5C43-4223-AB20-0E8CF3021BBE}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{55826966-5C43-4223-AB20-0E8CF3021BBE}.Debug|x86.Build.0 = Debug|Any CPU
+		{55826966-5C43-4223-AB20-0E8CF3021BBE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{55826966-5C43-4223-AB20-0E8CF3021BBE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{55826966-5C43-4223-AB20-0E8CF3021BBE}.Release|x64.ActiveCfg = Release|Any CPU
+		{55826966-5C43-4223-AB20-0E8CF3021BBE}.Release|x64.Build.0 = Release|Any CPU
+		{55826966-5C43-4223-AB20-0E8CF3021BBE}.Release|x86.ActiveCfg = Release|Any CPU
+		{55826966-5C43-4223-AB20-0E8CF3021BBE}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -82,5 +96,6 @@ Global
 		{7835285E-9330-4AA1-A584-DE915C9A4C62} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{441739D8-9276-478D-B34E-D4A93CFE928D} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{6C08D071-C0BE-45CF-990C-9F1EA4B43D43} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{55826966-5C43-4223-AB20-0E8CF3021BBE} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
