@@ -158,8 +158,10 @@ commentaire) : [docs/cells.example.json](docs/cells.example.json).
 ### Claude Code
 
 La cellule `claude` (posée par défaut) montre, en anneau, la fenêtre de session (5 h) ; sa carte
-liste toutes les fenêtres de limite avec leur reset, la répartition hebdomadaire par surface, et
-les sessions Claude Code en cours (occupée / en attente / inactive / terminée). Le jeton vient de
+liste toutes les fenêtres de limite avec, en petit sous chaque barre, la date et l'heure de reset.
+Deux options par cellule ajoutent la répartition hebdomadaire par surface (`breakdown`) et les
+sessions Claude Code en cours (`sessions` : occupée / en attente / inactive / terminée, avec la
+pastille qui suit leur état). Le jeton vient de
 `~/.claude/.credentials.json` (lecture seule, jamais journalisé) et se renouvelle tout seul avant
 d'expirer (`claude -p`, fenêtre cachée) ; sans jeton valide, la cellule dit « Connexion requise ».
 
