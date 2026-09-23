@@ -28,20 +28,20 @@ formes **A rondes et B carrées arrondies** au choix, carte **mise en page B** (
 ```json
 {
   "version": 1,
-  "appearance": { "activity": "dot", "card_scale": 1.0 },
-  "pills": [ { "id": "main", "edge": "right", "cells_shape": "square", "cells": [
+  "appearance": { "activity": "dot", "cardScale": 1.0 },
+  "pills": [ { "id": "main", "edge": "right", "cellsShape": "square", "cells": [
       { "id": "media", "source": "media", "label": "Spotify", "caption": false, "activity": "ring", "params": { "fallbackOpen": "spotify:" } } ] } ]
 }
 ```
-- `CellsFile.Appearance : AppearanceConfig { Activity = "dot", CardScale = 1.0 }` (validé : `activity` ∈ dot|ring, `card_scale` ∈ [1, 1.5]).
-- `PillConfig.CellsShape : string = "round"` (validé ∈ round|square). Nom JSON `cells_shape` (pas `cells`, déjà pris par la liste).
+- `CellsFile.Appearance : AppearanceConfig { Activity = "dot", CardScale = 1.0 }` (validé : `activity` ∈ dot|ring, `cardScale` ∈ [1, 1.5]).
+- `PillConfig.CellsShape : string = "round"` (validé ∈ round|square). Nom JSON `cellsShape` (politique camelCase de `CellsJson`).
 - `CellConfig.Caption : bool?`, `CellConfig.Activity : string?` (validé ∈ dot|ring).
 - `SourceSchema.DefaultCaption : bool = true` ; `MediaSource` → false.
 - `CellView` gagne `Shape` (round|square), `Activity` (dot|ring), `ShowCaption` (bool) — calculés dans `CellViews.From/FromGroup` depuis pilule + cellule + schéma + appearance. `CellViews.From(cell, r, nowMs, pill, appearance, schema)` : signature étendue avec valeurs par défaut pour ne pas casser les tests.
 - `CardModel` gagne `Subtitle` déjà là ; `CardRow.Text` reçoit « % · absolu » pour les enfants de groupe ; `CardAction.Label` peut être vide.
 - `MediaState` gagne `PositionMs`, `DurationMs`, `PositionAtMs` (horodatage de la mesure) — null si la session ne les donne pas ; `MediaSource` produit `Reading.Value/Max` ? **Non** (cela ferait un anneau) : la position va dans `Detail` sous une forme dédiée : `DetailRow("position", Text: "2:31 / 5:55", Fraction: 0.42, Hint: "timeline")` reconnue par la carte (label `position`) — la pilule ignore les Detail.
 
-`ConfigEditor` : `SetPillShared(pillId, p => p["cells_shape"] = …)`, `SetCell` pour `caption`/`activity`, `SetAppearance(Action<JsonObject>)` (nouveau, partagé).
+`ConfigEditor` : `SetPillShared(pillId, p => p["cellsShape"] = …)`, `SetCell` pour `caption`/`activity`, `SetAppearance(Action<JsonObject>)` (nouveau, partagé).
 
 ## 3. Rendu (App)
 
@@ -60,7 +60,7 @@ formes **A rondes et B carrées arrondies** au choix, carte **mise en page B** (
 
 ## 5. Tests
 
-`CellViewTests` : forme/activité/légende résolues (pilule carrée → Shape square ; cellule `activity` surcharge l'appearance ; `caption:false` et défaut média → ShowCaption false) ; `ConfigValidationTests` : valeurs refusées (`cells_shape: "hex"`, `card_scale: 3`) ; `SquareArcTests` : fraction 0 → vide, 1 → périmètre complet, 0.25 → un quart, géométrie figée ; `CardContentTests` : sous-titre de synthèse, « % · absolu », actions média sans libellé ; `MediaSourceTests` : ligne `position` présente seulement avec timeline, `fallbackOpen` sans session → action par défaut `open`.
+`CellViewTests` : forme/activité/légende résolues (pilule carrée → Shape square ; cellule `activity` surcharge l'appearance ; `caption:false` et défaut média → ShowCaption false) ; `ConfigValidationTests` : valeurs refusées (`cellsShape: "hex"`, `cardScale: 3`) ; `SquareArcTests` : fraction 0 → vide, 1 → périmètre complet, 0.25 → un quart, géométrie figée ; `CardContentTests` : sous-titre de synthèse, « % · absolu », actions média sans libellé ; `MediaSourceTests` : ligne `position` présente seulement avec timeline, `fallbackOpen` sans session → action par défaut `open`.
 
 ## 6. Hors périmètre
 
