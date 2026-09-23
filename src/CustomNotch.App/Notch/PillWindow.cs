@@ -96,8 +96,16 @@ public sealed class PillWindow : Window
     {
         Pill = pill;
         _m = new PillMetrics(pill.Scale, _host.Appearance.CardScale);
+        // La carte est construite une seule fois (elle vit tout le cycle de la fenêtre) : sans ce rappel, elle
+        // gardait l'échelle posée à sa création et ignorait un changement ultérieur d'Appearance.CardScale.
+        _card.Apply(_m);
         Layout();
         if (IsLoaded) Reposition();
+        if (_card.IsOpen && _card.CellId is { } cardId && _hosts.TryGetValue(cardId, out var openHost))
+        {
+            _card.UpdateLayout();
+            PlaceCard(openHost);
+        }
     }
 
     /// <summary>Taille de la fenêtre et position de chaque élément dans le canvas. Le canvas de la pilule est posé
@@ -267,7 +275,10 @@ public sealed class PillWindow : Window
         var horizontal = !Vertical;
         foreach (var cell in Pill.Cells.Where(c => c.Visible))
         {
-            if (!_hosts.TryGetValue(cell.Id, out var host) || host.Cell.Source != cell.Source)
+            // Une échelle différente de celle du CellHost existant force aussi la reconstruction : ses tailles
+            // (Width, Ring, marges…) sont figées à la construction, jamais relues ensuite. Une pression en cours
+            // coupe net l'animation dans ce cas précis — rare (changer Pill.Scale), et acceptable.
+            if (!_hosts.TryGetValue(cell.Id, out var host) || host.Cell.Source != cell.Source || host.Scale != _m.Scale)
             {
                 host = new Cells.CellHost(cell, _m);
                 host.Hovered += OnCellHovered;
@@ -343,8 +354,11 @@ public sealed class PillWindow : Window
     private void PlaceCard(Cells.CellHost host)
     {
         var cellCenter = host.TranslatePoint(new Point(host.ActualWidth / 2, _m.Ring / 2), _canvas);
-        var w = _card.ActualWidth > 0 ? _card.ActualWidth : _m.CardWidth;
-        var h = _card.ActualHeight > 0 ? _card.ActualHeight : 100;
+        // ActualWidth/Height sont mesurés avant LayoutTransform (la carte garde une base de 340/100 non mise à
+        // l'échelle en interne) : l'empreinte réellement peinte à l'écran est ActualWidth/Height × CardScale.
+        // Sans ce facteur, une carte agrandie débordait sur la pilule (x trop à droite côté « right »).
+        var w = (_card.ActualWidth > 0 ? _card.ActualWidth : 340) * _m.CardScale;
+        var h = (_card.ActualHeight > 0 ? _card.ActualHeight : 100) * _m.CardScale;
         var pillLeft = Canvas.GetLeft(_shape);
         var pillTop = Canvas.GetTop(_shape);
         double x, y;

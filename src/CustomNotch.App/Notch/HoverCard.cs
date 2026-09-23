@@ -16,8 +16,12 @@ namespace CustomNotch.App.Notch;
 /// l'entrée, fermée 250 ms après la sortie, et gardée tant que le pointeur est dedans.</summary>
 public sealed class HoverCard : Border
 {
+    /// <summary>La largeur de base (avant CardScale) : LayoutTransform grandit tout le reste, elle ne bouge
+    /// jamais elle-même — sans quoi la mise à l'échelle s'appliquerait deux fois.</summary>
+    private const double BaseWidth = 340;
+    private const double BaseMinWidth = 240;
     private readonly IPillHost _host;
-    private readonly PillMetrics _m;
+    private PillMetrics _m;
     private readonly StackPanel _stack = new();
     private readonly DispatcherTimer _hide = new() { Interval = TimeSpan.FromMilliseconds(250) };
     /// <summary>Fait avancer la barre de position d'une seconde à l'autre entre deux lectures de la session (qui ne
@@ -42,8 +46,8 @@ public sealed class HoverCard : Border
         Effect = new DropShadowEffect { BlurRadius = 40, ShadowDepth = 12, Opacity = 0.45, Direction = 270 };
         // La base reste 340/240 quelle que soit l'échelle : LayoutTransform (ci-dessous) multiplie tout d'un coup,
         // deux fois sinon (PillMetrics.CardWidth est déjà à l'échelle, pour la réserve côté fenêtre).
-        MaxWidth = 340;
-        MinWidth = 240;
+        MaxWidth = BaseWidth;
+        MinWidth = BaseMinWidth;
         LayoutTransform = new ScaleTransform(_m.CardScale, _m.CardScale);
         Visibility = Visibility.Collapsed;
         Child = new ScrollViewer { Content = _stack, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, MaxHeight = 480 };
@@ -55,6 +59,18 @@ public sealed class HoverCard : Border
 
     public string? CellId => _cellId;
     public bool IsOpen => Visibility == Visibility.Visible;
+
+    /// <summary>Reprend de nouvelles métriques (l'échelle de la carte, réglable sans redémarrer) : la carte vit
+    /// tout le cycle de la fenêtre et n'est jamais reconstruite, contrairement à ses lignes (Show, à chaque
+    /// survol) — sans ce rappel depuis PillWindow.Apply, un changement d'Appearance.CardScale dans les Réglages
+    /// restait sans effet tant que l'app ne redémarrait pas.</summary>
+    public void Apply(PillMetrics m)
+    {
+        _m = m;
+        MaxWidth = BaseWidth;
+        MinWidth = BaseMinWidth;
+        LayoutTransform = new ScaleTransform(_m.CardScale, _m.CardScale);
+    }
 
     public void Show(CardModel model, string cellId)
     {
@@ -123,10 +139,16 @@ public sealed class HoverCard : Border
 
     /// <summary>Une ligne : label 14 semi-gras à gauche, texte 13 gris à droite, barre 6 px si fraction, séparateur
     /// 1 px au-dessus (sauf la première). La ligne de position de lecture (hint « timeline:pos:dur:at ») n'a pas ce
-    /// gabarit : pas de label, barre pleine largeur, temps à gauche et à droite.</summary>
+    /// gabarit : pas de label, barre pleine largeur, temps à gauche et à droite — sauf hint malformé, où elle
+    /// retombe sur le gabarit normal sans barre ni minuteur (une source qui se trompe ne doit jamais planter la
+    /// carte).</summary>
     private UIElement Row(CardRow row, bool first)
     {
-        var content = row.Hint is { } h && h.StartsWith("timeline:", StringComparison.Ordinal) ? TimelineContent(row) : NormalContent(row);
+        var isTimeline = row.Hint is { } h && h.StartsWith("timeline:", StringComparison.Ordinal);
+        UIElement content;
+        if (isTimeline && ParseTimeline(row.Hint!, row.Tone) is { } t) content = TimelineContent(t);
+        else if (isTimeline) content = NormalContent(row with { Fraction = null });
+        else content = NormalContent(row);
         var wrapper = new Border { Padding = new Thickness(0, 9, 0, 9), Child = content };
         if (!first)
         {
@@ -166,12 +188,22 @@ public sealed class HoverCard : Border
         return grid;
     }
 
+    /// <summary>« timeline:pos:dur:at » → le triplet et l'état de lecture, ou null si le hint n'a pas exactement
+    /// quatre segments ou qu'un des trois nombres ne s'analyse pas — jamais d'exception, juste une ligne qui
+    /// retombe sur le gabarit normal.</summary>
+    private static (long Pos, long Dur, long At, bool Playing)? ParseTimeline(string hint, Status? tone)
+    {
+        var parts = hint.Split(':');
+        if (parts.Length != 4) return null;
+        if (!long.TryParse(parts[1], out var pos) || !long.TryParse(parts[2], out var dur) || !long.TryParse(parts[3], out var at)) return null;
+        return (pos, dur, at, tone == Status.Busy);
+    }
+
     /// <summary>La barre de position : plein largeur, couleur Busy (lecture), plus les deux temps dessous. Pose
     /// aussi l'état d'où le timer d'une seconde repart.</summary>
-    private UIElement TimelineContent(CardRow row)
+    private UIElement TimelineContent((long Pos, long Dur, long At, bool Playing) timeline)
     {
-        var parts = row.Hint!.Split(':');
-        _timeline = (long.Parse(parts[1]), long.Parse(parts[2]), long.Parse(parts[3]), row.Tone == Status.Busy);
+        _timeline = timeline;
         var panel = new StackPanel();
         var track = new Border { Height = 6, CornerRadius = new CornerRadius(3), Margin = new Thickness(0, 0, 0, 6) };
         track.SetResourceReference(BackgroundProperty, "Track");

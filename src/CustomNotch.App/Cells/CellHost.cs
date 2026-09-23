@@ -56,6 +56,9 @@ public sealed class CellHost : StackPanel
 
     public CellConfig Cell { get; private set; }
     public CellView? Last { get; private set; }
+    /// <summary>L'échelle des métriques figées à la construction : PillWindow.RebuildCells s'en sert pour
+    /// détecter qu'un CellHost existant est périmé (Pill.Scale a changé) et doit être reconstruit.</summary>
+    public double Scale => _m.Scale;
 
     public void Rebind(CellConfig cell) => Cell = cell;
 
