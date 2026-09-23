@@ -1,5 +1,22 @@
 # Journal des versions
 
+## 0.2.2 - 2026-09-23
+
+- **Cellules rondes ou carrées, au choix par pilule** (Réglages → pilule → Forme des cellules) : la jauge
+  devient un cadre qui se remplit, la pochette et le disque prennent la même forme.
+- **La lecture ne fait plus tourner d'anneau.** Occupé et Attention ne colorent que la pastille ; l'anneau
+  animé reste disponible (Réglages → Général → Apparence, ou par cellule).
+- **Légende masquable** sous chaque cellule ; la cellule média n'affiche plus de légende par défaut (le
+  titre est dans la carte).
+- **La carte au survol, refaite.** Plus grande (340 px, texte 14/13), lignes séparées, ombre, au thème
+  Windows clair/sombre comme la fenêtre Réglages ; échelle réglable jusqu'à 150 %. Les boutons portent
+  les icônes du pack ; précédent / lecture-pause / suivant sont des icônes seules.
+- **Carte média** : pochette en grand, titre et artiste en tête, position de lecture (barre et temps) qui
+  avance à la seconde ; plus de ligne « Application ». Sans lecture, le clic ouvre l'application
+  (`fallbackOpen`, `spotify:` par défaut).
+- **Carte Système** : sous-titre de synthèse (« tout va bien », « Disque à surveiller ») et valeurs
+  absolues à côté du pourcentage.
+
 ## 0.2.1 - 2026-09-23
 
 - **La pochette du média.** La cellule `media` montre la pochette de ce qui joue - en disque dans la

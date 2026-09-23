@@ -5,6 +5,10 @@
   // Ce que l'app décide seule (position après un glisser, écran, visibilité) va dans la
   // surcharge locale cells.<machine>.json, à côté de celui-ci — jamais ici.
   "version": 1,
+  // "appearance": { "activity": "dot", "cardScale": 1.0 },
+  // ↑ partagé, pour toutes les pilules : "activity" dot (pastille seule, par défaut) ou ring (anneau
+  // animé) ; "cardScale" 1.0 à 1.5, l'échelle de la carte au survol. Surchargeable par cellule
+  // ("activity" plus bas), réglable aussi depuis Réglages → Général → Apparence.
   "pills": [
     {
       "id": "main",                    // identifiant unique de la pilule (aussi la clé dans la surcharge locale)
@@ -12,6 +16,7 @@
       "along": 0.5,                    // position le long du bord : 0 = haut/gauche, 1 = bas/droite
       // "screen": "\\\\.\\DISPLAY2",  // nom d'écran (DeviceName Windows) ; absent = écran principal
       "scale": 1.0,                    // échelle de la pilule, entre 0.5 et 3
+      // "cellsShape": "square",       // round (défaut) ou square : la forme de toutes les cellules de la pilule
       "visible": true,
       "cells": [
         {

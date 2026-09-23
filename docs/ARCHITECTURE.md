@@ -227,8 +227,9 @@ sealed record Reading(
     byte[]? Image);
 ```
 
-`CellViews.From(cell, reading, nowMs)` en déduit une `CellView` (genre, statut, légende,
-fraction) sans aucune dépendance WPF — c'est ce que `CellHost`/`CellFace` dessinent, et ce que
+`CellViews.From(cell, reading, nowMs, pill?, appearance?, schema?)` en déduit une `CellView`
+(genre, statut, légende, fraction, forme, activité, légende visible) sans aucune dépendance WPF —
+c'est ce que `CellHost`/`CellFace` dessinent, et ce que
 `tests/CustomNotch.Core.Tests/Model` vérifie sans écran.
 
 - **Genre de rendu (`DeriveKind`), dans cet ordre** :
@@ -258,6 +259,14 @@ fraction) sans aucune dépendance WPF — c'est ce que `CellHost`/`CellFace` des
   l'enfant `headline` s'il est déclaré, sinon le pire enfant s'il a une fraction, sinon le
   premier enfant qui en a une, sinon le pire tout court. Le groupe n'est **périmé que si tous
   ses enfants le sont** (l'âge affiché est alors celui du plus ancien).
+- **Apparence résolue (`CellViews.Resolve`)**, fonction pure testée sans écran : `CellView.Shape`
+  (`round` | `square`) vient de la pilule (`PillConfig.CellsShape`) ; `Activity` (`dot` | `ring`)
+  vient de la cellule (`CellConfig.Activity`) sinon de l'apparence globale
+  (`AppearanceConfig.Activity`, `cells.json` → `appearance`, défaut `dot`) ; `ShowCaption` vient
+  de la cellule (`CellConfig.Caption`) sinon du schéma de sa source (`SourceSchema.DefaultCaption`,
+  `false` pour `media`), sinon `true`. Un groupe n'a pas de schéma : `FromGroup` résout sa légende
+  sur le défaut `true`. `dot` : Busy/Attention ne colorent que la pastille de la cellule ; `ring` :
+  l'arc animé d'aujourd'hui tourne autour d'elle.
 - **`Reading.Image` / `CellView.Image`** : une image (PNG/JPEG, ≤ 512 Ko) à montrer à la place du
   glyph — la pochette de `media`, pour l'instant. `CellViews.From` la reprend telle quelle ;
   `FromGroup` montre celle de l'enfant `headline`, comme sa légende. Décodée une seule fois côté
@@ -293,7 +302,7 @@ sous-projets du plan 3 (§10).
 | `system.disk` | `drive` (défaut « C: ») | 1 min | `Value`/`Max` en Go, `Detail` (utilisé/total, libre) | `open` : ouvre le lecteur dans l'explorateur |
 | `system.network` | `iface?` (vide = toutes les interfaces actives) | 2 s | `Value` = débit total (Ko/s sous 1 Mo/s, Mo/s au-dessus), `Unit`, `Detail` (↓ réception, ↑ émission), `History` | — |
 | `system.battery` | — | 30 s | `Value` %, `Max` 100 ; `Status.Off` sans batterie ; `Ok` sur secteur, sinon seuils 20 %/10 % inversés ; `Detail` (charge, secteur ou temps restant) | — |
-| `media` | — | 5 s (+ poussé au changement) | `Text` = « Titre — Artiste » ; `Status.Busy` en lecture, `Off` sans session ; `Detail` (titre, artiste, application source) ; `Image` = la pochette (PNG/JPEG, ≤ 512 Ko), si la session en donne une | `prev`, `toggle` (lecture/pause), `next` |
+| `media` | `fallbackOpen` (cible ouverte au clic sans lecture, défaut « spotify: ») | 5 s (+ poussé au changement) | `Text` = « Titre — Artiste » ; `Status.Busy` en lecture, `Off` sans session ; `Detail` = une ligne `position` (temps `m:ss / m:ss`, fraction, hint `timeline:pos:dur:at`) si la session donne une durée ; sans session, une ligne « Lecture : aucune — cliquer ouvre l'application » ; `Image` = la pochette (PNG/JPEG, ≤ 512 Ko), si la session en donne une | `prev`, `toggle` (lecture/pause), `next`, sans libellé, en lecture ; `open` sans session |
 | `http` | `url`\*, `method` (GET/POST), `path`, `textPath`, `max?`, `unit?`, `body?`, `headers{}` | 1 min | `Value`/`Text` extraits du JSON par `path`/`textPath` (`JsonPath` minimal : « data.items[0].n ») ; `Max`/`Unit` s'ils sont fournis ; `Detail` d'une ligne | — |
 | `shell` | `command`\*, `parse` (number / json / text), `path?` (si json), `max?`, `unit?`, `timeoutSeconds` (5) | 1 min | selon `parse` : un nombre (+ `Max`/`Unit`), un nœud JSON pointé, ou le texte de sortie (`Detail`) | — |
 | `launcher` | `open`\* | 24 h | `Status.Off`, `Text` = la cible | `open` : ouvre la cible (URL, chemin, application) |
@@ -311,7 +320,15 @@ WinRT) — Spotify, un onglet de navigateur, VLC… — celle que Windows choisi
 sans implémentation (tests, un autre OS) la source rend simplement `Off`. `WindowsMediaSession`
 lit aussi sa vignette (`ReadThumbnailAsync`), plafonnée à **512 Ko** (une image plus grande est
 ignorée) ; l'égalité de `MediaState` compare la pochette **par contenu**, pas par référence — un
-tableau relu à chaque rafraîchissement ne doit pas déclencher `Changed` en boucle.
+tableau relu à chaque rafraîchissement ne doit pas déclencher `Changed` en boucle. Elle lit aussi
+`session.GetTimelineProperties()` (`ReadTimeline`) : position, durée et horodatage de la mesure
+(`MediaState.PositionMs/DurationMs/PositionAtMs`), les trois `null` si la session ne publie pas
+de durée exploitable (flux en direct, application muette). Spotify et la plupart des
+applications ne republient la timeline que toutes les quelques secondes (elle s'abonne aussi à
+`TimelinePropertiesChanged`) ; l'avance à la seconde entre deux publications est reconstituée
+côté carte (`HoverCard`, §6) à partir de `PositionAtMs`, jamais ici. Sans session (ou avec une
+session sans lecture en cours), `MediaSource.InvokeAsync("toggle"|"open")` ouvre `fallbackOpen`
+(`ActionRunner.Open`, injectable pour les tests) au lieu de ne rien faire.
 
 ---
 
@@ -320,8 +337,12 @@ tableau relu à chaque rafraîchissement ne doit pas déclencher `Changed` en bo
 - **`PillMetrics`** — tout le dessin part d'ici, à l'échelle `scale` de la pilule : largeur
   **70 px**, coins libres **20 px**, fillets inversés **38,7 px**, anneau **44 px**, légende
   **15 px** (semi-gras, hauteur réservée 18 px), écart entre cellules 14 px, padding interne de
-  la pilule 18 px de chaque côté du corps. Carte : largeur max **246 px**, rayon **16 px**,
-  padding **16 px**, posée à **8 px** de la pilule, sans queue.
+  la pilule 18 px de chaque côté du corps. `CardScale` (**1.0** à **1.5**, `Appearance.CardScale`,
+  réglable dans Réglages → Général → Apparence) est **indépendante** de `Scale` : elle ne
+  grandit que la carte au survol, jamais la pilule. `CardWidth` (la réserve côté fenêtre) =
+  **340 × CardScale** ; la carte elle-même garde une largeur de base de 340 (min 240) et se met
+  à l'échelle par `LayoutTransform`, pour ne jamais multiplier deux fois. Rayon **18 px**,
+  padding **20/18**, ombre portée, posée à **8 px** de la pilule, sans queue.
 - **`PillShape.Build`** dessine la silhouette pour le bord droit (un `StreamGeometry` : le
   corps aux coins arrondis côté libre, et deux fillets inversés côté écran — le carré au-dessus
   du corps moins un quart de cercle, comme le `::before` de codenotch), puis applique une
@@ -352,13 +373,23 @@ tableau relu à chaque rafraîchissement ne doit pas déclencher `Changed` en bo
   position (`along`, `screen`) part alors dans `cells.<machine>.json`.
 - **Carte hover** (`HoverCard` + `CardContent.Build`) : s'ouvre **150 ms** après l'entrée dans
   une cellule, se ferme **250 ms** après la sortie, reste ouverte tant que le pointeur y est
-  (`CancelHide`/`HideLater`). Contenu calculé sans WPF : en-tête (glyph + label), une ligne par
-  `Detail` (ou une seule ligne label/valeur si la source n'en donne pas), les enfants pour un
-  groupe (label, légende, fraction, l'indication du premier `Detail`), les boutons de la config
-  (`actions.card`) puis ceux déclarés par la source (`Reading.Actions`, dont `prev`/`toggle`/
-  `next` du média), une notice de péremption si la cellule est périmée. `PillWindow.PlaceCard`
-  la centre sur la cellule côté libre, bornée à la fenêtre, à 8 px de la pilule (sans queue
-  vers la cellule : le triangle a été retiré en 0.2.0).
+  (`CancelHide`/`HideLater`). **Au thème Windows**, comme la fenêtre Réglages (`Surface`, `Fg`,
+  `Muted`, `Border`, `Track`, posés par `SetResourceReference`) — la pilule, elle, reste noire.
+  En-tête : la pochette (56 px, coins 12) ou une tuile (40 px, coins 10, le glyph) à gauche,
+  titre 17 semi-gras et sous-titre 13 gris à droite. Une ligne par `Detail` (label 14 semi-gras,
+  valeur 13 à droite, barre 6 px colorée par statut, séparateur 1 px entre deux lignes) ; la
+  ligne `position` du média (hint `timeline:pos:dur:at`) n'a pas ce gabarit : barre pleine
+  largeur couleur Busy, temps `m:ss` à gauche et durée à droite, ré-animée chaque seconde par un
+  `DispatcherTimer` tant que la carte est ouverte (`UpdateTimeline`, avance locale depuis
+  `PositionAtMs`) — un hint malformé retombe sur le gabarit normal sans planter. Les enfants
+  d'un groupe font une ligne chacun (label, `caption` seule ou `caption + " · " + detail[0].Text`
+  quand ils diffèrent, fraction, statut). Boutons : une `UniformGrid` d'icônes seules, centrées
+  (le bouton du milieu plus large, 64 px), quand toutes les actions ont un libellé vide — les
+  trois du média (`prev`/`toggle`/`next`) — sinon un `WrapPanel` de boutons icône + texte
+  (`GlyphLibrary`, style `CardButton` : fond `SurfaceHover`, rayon 10). Une notice de péremption
+  si la cellule est périmée. `PillWindow.PlaceCard` la centre sur la cellule côté libre, bornée
+  à la fenêtre (empreinte réelle = `ActualWidth/Height × CardScale`), à 8 px de la pilule (sans
+  queue vers la cellule : le triangle a été retiré en 0.2.0).
 - **Plein écran** (`FullScreenDetector`) : au tic d'une seconde (`Controller._tick`), la
   fenêtre au premier plan est comparée aux limites de l'écran de la pilule (le bureau et le
   shell — `Progman`, `WorkerW`, `Shell_TrayWnd` — ne comptent jamais). La visibilité de
@@ -369,14 +400,26 @@ tableau relu à chaque rafraîchissement ne doit pas déclencher `Changed` en bo
 - **Cellule** : anneau (`RingCell`), valeur (`ValueCell`), statut (`StatusCell`) ou sparkline
   (`SparklineCell`) — la face change si le genre déduit change (`CellHost.Render`). Glyph 26 px
   au centre d'un carré de 44 px (`Geometry`, glyphes codenotch convertis + `GlyphLibrary`),
-  couleur de l'anneau par statut (`StatusPalette`) ; Busy dessine un arc fin qui tourne
-  par-dessus (1,2 s/tour), Attention une pulsation ambre (opacité 1 → 0,25, 0,55 s,
-  aller-retour) — communs aux quatre faces (`CellFace.Activity`). Pression au clic : échelle
-  93 %, ressort 300 ms (`BackEase`). `StatusCell` remplit son disque de la pochette
+  couleur de l'anneau par statut (`StatusPalette`). **Forme** (`view.Shape`, `round` | `square`,
+  posée par la pilule) : ronde comme avant, ou carrée — `RingCell` suit alors le contour d'un
+  carré à coins arrondis (`SquareArc.Geometry(fraction, size, radius)`, rayon `12/44 × Ring`, une
+  géométrie pure testée sans écran, contour parcouru en sens horaire depuis le milieu du bord
+  haut — même origine que `RingArc`) au lieu du cercle, et `StatusCell` remplit un `Border`
+  `CornerRadius` au lieu d'un disque ; les deux jeux d'éléments existent toujours, `Render`
+  bascule juste leur `Visibility`. **Activité** (`view.Activity`, `dot` | `ring`) : `dot` (par
+  défaut) — Busy/Attention ne colorent que la pastille de statut ou la teinte de l'anneau, aucun
+  arc, aucune animation ; `ring` — l'arc animé d'aujourd'hui, Busy tourne (1,2 s/tour), Attention
+  pulse (opacité 1 → 0,25, 0,55 s, aller-retour), en rond ou, en forme carrée, le long du contour
+  de `SquareArc` (elle tourne quand même, autour du centre : ça reste lisible) — commun aux
+  quatre faces (`CellFace.Activity`). Pression au clic : échelle 93 %, ressort 300 ms
+  (`BackEase`). `StatusCell` remplit son disque (ou son carré) de la pochette
   (`CoverImage.Decode(view.Image)`, `ImageBrush` figée) à la place du glyph quand la lecture en
   porte une ; `CoverImage` décode une fois (cache par référence du tableau, dernier décodé
   seulement) et rend `null` sur une image illisible, auquel cas la cellule retombe sur son
-  glyph. `HoverCard` fait de même en grand (40×40, coins 8 px) dans l'en-tête de la carte.
+  glyph. `HoverCard` fait de même en grand (56×56, coins 12) dans l'en-tête de la carte. La
+  légende (`CellHost`) est masquée (`Visibility.Hidden`, pas `Collapsed`) quand
+  `view.ShowCaption` est faux : la hauteur réservée ne bouge pas, le pas des cellules reste
+  régulier.
 
 ---
 
@@ -392,11 +435,15 @@ même fenêtre (`Controller.ShowSettings`).
   (`PillsPage`, cellule masquée grisée, enfants d'un groupe indentés dessous) avec une barre
   d'outils (**+ Pilule**, **+ Cellule** via `SourceCatalogDialog`, **↑ ↓**, **Masquer /
   Afficher**, **Supprimer**) ; à droite `PillEditor` (bord, écran, position le long du bord,
-  échelle, visible) ou `CellEditor`, quatre sections : **Source** (type, description, bouton
-  « Changer… », puis le formulaire généré par `SchemaForm`), **Affichage** (libellé, glyph via
-  `GlyphGallery` ou un tracé SVG, type de rendu, cadence, seuils warn/crit + inversé),
-  **Actions** (clic et boutons de carte, chacun une action au choix), **Groupe** (cases sur les
-  autres cellules de la pilule, tête parmi les cochées).
+  échelle, **forme des cellules** — Combo « Rondes » / « Carrées arrondies », écrit
+  `PillConfig.CellsShape`, partagé —, visible) ou `CellEditor`, quatre sections : **Source**
+  (type, description, bouton « Changer… », puis le formulaire généré par `SchemaForm`),
+  **Affichage** (libellé, glyph via `GlyphGallery` ou un tracé SVG, **légende sous la cellule**
+  — Combo « Selon la source » / « Toujours » / « Jamais », `CellConfig.Caption` —, **activité**
+  — Combo « Par défaut » / « Pastille seule » / « Anneau animé », `CellConfig.Activity` —, type
+  de rendu, cadence, seuils warn/crit + inversé), **Actions** (clic et boutons de carte, chacun
+  une action au choix), **Groupe** (cases sur les autres cellules de la pilule, tête parmi les
+  cochées).
 - **`SchemaForm.Build(SourceSchema, params, onChange)`** génère une rangée par champ, groupée
   par `SchemaField.Group` ; contrôle par type : `string` → champ texte, `number` → champ
   numérique validé, `bool` → case, `choice` → liste, `path` → champ + « … », `url` → champ
@@ -406,10 +453,13 @@ même fenêtre (`Controller.ShowSettings`).
   cette version — Claude Code et ClickUp en auront, plan 3 — la page le dit) et la liste des
   secrets de `secrets.json` : nom, « défini » (jamais la valeur), Effacer.
 - **Page « Général »** : emplacement de `cells.json` (chemin, Parcourir…, Ouvrir le dossier,
-  « prise en compte au redémarrage »), démarrage automatique (`Autostart`, case reflétant la
-  clé Run — la tâche planifiée de l'installateur, §8, fait le même effet sans cette case),
-  thème système/clair/sombre (`config.json → appearance.theme`, `Theme.Apply` immédiat),
-  Ouvrir le journal, version, lien vers le dépôt.
+  « prise en compte au redémarrage »), une carte **Apparence** (nouvelle, avant **Poste**) —
+  **indicateur d'activité** (Combo « Pastille seule » / « Anneau animé », `Appearance.Activity`,
+  partagé) et **échelle de la carte** (curseur 100 % à 150 % par pas de 5, `Appearance.CardScale`)
+  —, puis démarrage automatique (`Autostart`, case reflétant la clé Run — la tâche
+  planifiée de l'installateur, §8, fait le même effet sans cette case), thème système/clair/
+  sombre (`config.json → appearance.theme`, `Theme.Apply` immédiat), Ouvrir le journal, version,
+  lien vers le dépôt.
 - **Toute modification passe par `ConfigEditor`** (anti-rebond 300 ms sur les champs texte),
   qui route chaque champ vers le bon fichier : le partagé (`cells.json`, un choix de
   configuration), le local (`cells.<machine>.json` — visibilité d'une cellule, comme la

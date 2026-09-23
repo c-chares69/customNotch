@@ -131,6 +131,12 @@ Une cellule par source livrée avec le socle :
 { "id": "clickup", "source": "launcher",       "params": { "open": "https://app.clickup.com" } }
 ```
 
+`appearance` (racine, partagé) : `{ "activity": "dot|ring", "cardScale": 1.0-1.5 }` — l'indicateur
+d'activité (pastille seule ou anneau animé) et l'échelle de la carte au survol, par défaut pour toutes
+les cellules. `cellsShape` (par pilule, `"round"` ou `"square"`), `caption` et `activity` (par cellule,
+`bool`/`string`, surchargent l'apparence globale) : forme, légende et indicateur propres à une pilule
+ou une cellule.
+
 Exemple complet, commenté champ par champ (deux pilules, un groupe, un exemple `http` en
 commentaire) : [docs/cells.example.json](docs/cells.example.json).
 
@@ -143,7 +149,7 @@ commentaire) : [docs/cells.example.json](docs/cells.example.json).
 | `system.disk` | `drive` (« C: ») | anneau, Go utilisés / total, action « ouvrir » |
 | `system.network` | `iface` (facultatif) | débit Ko/s ou Mo/s, historique |
 | `system.battery` | — | anneau %, secteur ou temps restant |
-| `media` | — | titre — artiste de ce qui joue, occupée en lecture, actions précédent / lecture-pause / suivant, avec la pochette |
+| `media` | `fallbackOpen` (cible ouverte au clic sans lecture, « spotify: » par défaut) | titre — artiste de ce qui joue, occupée en lecture, position de lecture (dans la carte), actions précédent / lecture-pause / suivant, avec la pochette |
 | `http` | `url`, `method`, `path`, `textPath`, `max`, `unit`, `headers`, `body` | valeur ou texte extrait d'une réponse JSON |
 | `shell` | `command`, `parse`, `path`, `max`, `unit`, `timeoutSeconds` | valeur, JSON pointé, ou texte de sortie d'une commande |
 | `launcher` | `open` | rien à lire : un glyph et une action « ouvrir » |
