@@ -80,6 +80,10 @@ public sealed class WindowsMediaSession : IMediaSession, IDisposable
             var playing = session.GetPlaybackInfo()?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
             var title = props?.Title ?? "";
             var cover = await ReadThumbnailAsync(props?.Thumbnail);
+            // Même pochette qu'avant (lecture/pause sur la même piste) : on garde l'ancien tableau, pour que
+            // l'interface, qui met en cache l'image décodée par référence, ne la redécode pas à chaque bascule.
+            var previous = Current()?.Cover;
+            if (cover is not null && previous is not null && previous.AsSpan().SequenceEqual(cover)) cover = previous;
             Set(title.Length == 0 ? null : new MediaState(title, props?.Artist ?? "", AppName(session.SourceAppUserModelId), playing, cover));
         }
         catch (Exception ex)
