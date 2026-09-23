@@ -1,14 +1,18 @@
 namespace CustomNotch.Core.Sources.Media;
 
 /// <summary>Ce qui joue en ce moment, tel que le système le rapporte ; la pochette telle que reçue (PNG/JPEG), ou null.
+/// PositionMs/DurationMs/PositionAtMs : la timeline de lecture (null si le système ne la donne pas) — PositionAtMs
+/// est l'horodatage (époque, ms) de la mesure, pour que la carte avance la position localement entre deux lectures.
 /// L'égalité compare la pochette par contenu : un tableau relu à chaque rafraîchissement ne doit pas faire croire à un
 /// changement (Changed serait levé en boucle).</summary>
-public sealed record MediaState(string Title, string Artist, string App, bool Playing, byte[]? Cover = null)
+public sealed record MediaState(string Title, string Artist, string App, bool Playing, byte[]? Cover = null,
+    long? PositionMs = null, long? DurationMs = null, long? PositionAtMs = null)
 {
     public bool Equals(MediaState? other) =>
         other is not null && Title == other.Title && Artist == other.Artist && App == other.App && Playing == other.Playing
+        && PositionMs == other.PositionMs && DurationMs == other.DurationMs && PositionAtMs == other.PositionAtMs
         && ((Cover is null && other.Cover is null) || (Cover is not null && other.Cover is not null && Cover.AsSpan().SequenceEqual(other.Cover)));
-    public override int GetHashCode() => HashCode.Combine(Title, Artist, App, Playing, Cover?.Length ?? 0);
+    public override int GetHashCode() => HashCode.Combine(Title, Artist, App, Playing, Cover?.Length ?? 0, PositionMs, DurationMs, PositionAtMs);
 }
 
 /// <summary>La session média du système, vue de Core : lire l'état, agir, et prévenir. L'implémentation (WinRT) vit dans

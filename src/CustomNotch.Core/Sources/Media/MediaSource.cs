@@ -1,18 +1,26 @@
+using CustomNotch.Core.Actions;
 using CustomNotch.Core.Model;
 
 namespace CustomNotch.Core.Sources.Media;
 
-/// <summary>La cellule « ce qui joue » : titre — artiste, occupée en lecture, boutons précédent / lecture-pause / suivant.
+/// <summary>La cellule « ce qui joue » : titre — artiste, occupée en lecture, boutons précédent / lecture-pause / suivant
+/// sans libellé (la carte les montre en icônes seules), position de lecture quand la session la donne. Sans lecture,
+/// le clic ouvre <c>fallbackOpen</c> (un lecteur à lancer, « spotify: » par défaut) plutôt que de ne rien faire.
 /// Une seule instance sert toutes les cellules média : elle retient leurs ids pour les pousser au changement.</summary>
 public sealed class MediaSource : SourceBase
 {
+    private const string DefaultFallback = "spotify:";
     private readonly IMediaSession? _session;
+    private readonly Func<string, bool> _open;
     private readonly HashSet<string> _cells = new();
     private readonly object _lock = new();
 
-    public MediaSource(IMediaSession? session)
+    /// <summary><paramref name="open"/> : injectable pour les tests (défaut <see cref="ActionRunner.Open"/>) — ouvre
+    /// le repli configuré quand un clic arrive sans session média.</summary>
+    public MediaSource(IMediaSession? session, Func<string, bool>? open = null)
     {
         _session = session;
+        _open = open ?? ActionRunner.Open;
         if (session is not null) session.Changed += () =>
         {
             string[] ids;
@@ -22,34 +30,47 @@ public sealed class MediaSource : SourceBase
     }
 
     public override string Type => "media";
-    public override SourceSchema Schema => new(Type, "Média", Array.Empty<SchemaField>(), "music",
-        "Ce qui joue (Spotify, navigateur, VLC…) : titre, lecture/pause, piste suivante", "toggle");
+    public override SourceSchema Schema => new(Type, "Média",
+        new[] { new SchemaField("fallbackOpen", "string", "Sans lecture, le clic ouvre", Default: DefaultFallback) },
+        "music", "Ce qui joue (Spotify, navigateur, VLC…) : titre, lecture/pause, piste suivante", "toggle",
+        DefaultCaption: false);
     public override TimeSpan DefaultRefresh => TimeSpan.FromSeconds(5);
+
+    /// <summary>« 2:31 » : minutes sans zéro devant, secondes sur deux chiffres.</summary>
+    private static string Clock(long ms) => $"{ms / 60000}:{ms / 1000 % 60:00}";
 
     public override Task<Reading> ReadAsync(CellContext ctx, CancellationToken ct)
     {
         lock (_lock) _cells.Add(ctx.CellId);
         var state = _session?.Current();
         if (state is null)
-            return Task.FromResult(new Reading(Text: "Aucune lecture", Status: Status.Off, Detail: new[] { new DetailRow("Lecture", "aucune session média") }));
+            return Task.FromResult(new Reading(Text: "Aucune lecture", Status: Status.Off,
+                Detail: new[] { new DetailRow("Lecture", "aucune — cliquer ouvre l'application") },
+                Actions: new[] { new ActionSpec("open", "Ouvrir", "open") }));
         var text = state.Artist.Length > 0 ? $"{state.Title} — {state.Artist}" : state.Title;
+        // La position va dans Detail sous une forme dédiée (label « position », Hint « timeline:… ») : elle ne
+        // doit jamais faire un anneau sur la pilule (Value/Max resteraient null), seule la carte la lit.
+        var detail = state.PositionMs is { } pos && state.DurationMs is { } dur and > 0
+            ? new[] { new DetailRow("position", $"{Clock(pos)} / {Clock(dur)}", (double)pos / dur, $"timeline:{pos}:{dur}:{state.PositionAtMs}") }
+            : Array.Empty<DetailRow>();
         return Task.FromResult(new Reading(Text: text, Status: state.Playing ? Status.Busy : Status.Ok,
-            Detail: new[]
-            {
-                new DetailRow("Titre", state.Title), new DetailRow("Artiste", state.Artist.Length > 0 ? state.Artist : "—"),
-                new DetailRow("Application", state.App),
-            },
+            Detail: detail,
             Actions: new[]
             {
-                new ActionSpec("prev", "Précédent", "prev"), new ActionSpec("toggle", state.Playing ? "Pause" : "Lecture", state.Playing ? "pause" : "play"),
-                new ActionSpec("next", "Suivant", "next"),
+                new ActionSpec("prev", "", "prev"), new ActionSpec("toggle", "", state.Playing ? "pause" : "play"),
+                new ActionSpec("next", "", "next"),
             },
             Image: state.Cover));
     }
 
     public override Task InvokeAsync(string action, CellContext ctx, CancellationToken ct)
     {
-        if (_session is null) return Task.CompletedTask;
+        // « Sans session » = rien à piloter : pas d'implémentation, ou une implémentation sans lecture en cours.
+        if (_session is null || _session.Current() is null)
+        {
+            if (action is "toggle" or "open") _open(ctx.Str("fallbackOpen") ?? DefaultFallback);
+            return Task.CompletedTask;
+        }
         return action switch
         {
             "toggle" => _session.ToggleAsync(),

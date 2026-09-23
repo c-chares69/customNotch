@@ -59,4 +59,73 @@ public class CardContentTests
         Assert.Contains("il y a 1 min", model.Note);
         Assert.Contains("réseau", model.Note);
     }
+
+    [Fact]
+    public void Un_groupe_a_une_synthese_et_des_valeurs_absolues()
+    {
+        var cpu = View("cpu", new Reading(Value: 34, Max: 100, Status: Status.Ok), "CPU");
+        var mem = View("mem", new Reading(Value: 61, Max: 100, Status: Status.Ok, Detail: new[] { new DetailRow("Utilisée", "9,8 Go", 0.61) }), "Mémoire");
+        var disk = View("disk", new Reading(Value: 80, Max: 100, Status: Status.Warn), "Disque");
+        var group = new CellConfig { Id = "g", Label = "Système", Children = new() { "cpu", "mem", "disk" } };
+        var model = CardContent.Build(CellViews.From(group, Reading.Empty, 0), group, new[] { cpu, mem, disk });
+        Assert.Equal("Disque à surveiller", model.Subtitle);
+        var cpuRow = model.Rows.Single(r => r.Label == "CPU");
+        Assert.Equal("34%", cpuRow.Text);
+        var memRow = model.Rows.Single(r => r.Label == "Mémoire");
+        Assert.Equal("61% · 9,8 Go", memRow.Text);
+    }
+
+    [Fact]
+    public void Un_enfant_critique_l_emporte_sur_un_enfant_a_surveiller()
+    {
+        var warn = View("w", new Reading(Value: 1, Status: Status.Warn), "Attention");
+        var crit = View("c", new Reading(Value: 1, Status: Status.Crit), "Alerte");
+        var ok = View("o", new Reading(Value: 1, Status: Status.Ok), "Calme");
+        var group = new CellConfig { Id = "g", Children = new() { "w", "c", "o" } };
+        var model = CardContent.Build(CellViews.From(group, Reading.Empty, 0), group, new[] { warn, crit, ok });
+        Assert.Equal("Alerte critique", model.Subtitle);
+    }
+
+    [Fact]
+    public void Un_groupe_sans_alerte_dit_tout_va_bien()
+    {
+        var a = View("a", new Reading(Value: 1, Status: Status.Ok), "A");
+        var b = View("b", new Reading(Value: 1, Status: Status.Ok), "B");
+        var group = new CellConfig { Id = "g", Children = new() { "a", "b" } };
+        var model = CardContent.Build(CellViews.From(group, Reading.Empty, 0), group, new[] { a, b });
+        Assert.Equal("tout va bien", model.Subtitle);
+    }
+
+    [Fact]
+    public void Une_cellule_media_a_le_titre_en_tete()
+    {
+        var cover = new byte[] { 9, 9, 9 };
+        var reading = new Reading(Text: "Bohemian Rhapsody — Queen", Status: Status.Busy,
+            Detail: new[] { new DetailRow("position", "2:31 / 5:55", 0.42, "timeline:151000:355000:1790168101000") },
+            Image: cover);
+        var cell = new CellConfig { Id = "media", Source = "media", Label = "Spotify" };
+        var view = CellViews.From(cell, reading, 0);
+        var model = CardContent.Build(view, cell, Array.Empty<CellView>());
+        Assert.Equal("Bohemian Rhapsody", model.Title);
+        Assert.Equal("Queen", model.Subtitle);
+        var row = Assert.Single(model.Rows);
+        Assert.Equal("position", row.Label);
+        Assert.Equal("2:31 / 5:55", row.Text);
+        Assert.Same(cover, model.Image);
+    }
+
+    [Fact]
+    public void Une_cellule_media_sans_lecture_garde_le_libelle_de_la_cellule()
+    {
+        var reading = new Reading(Text: "Aucune lecture", Status: Status.Off,
+            Detail: new[] { new DetailRow("Lecture", "aucune — cliquer ouvre l'application") },
+            Actions: new[] { new ActionSpec("open", "Ouvrir", "open") });
+        var cell = new CellConfig { Id = "media", Source = "media", Label = "Spotify" };
+        var view = CellViews.From(cell, reading, 0);
+        var model = CardContent.Build(view, cell, Array.Empty<CellView>());
+        Assert.Equal("Spotify", model.Title);
+        Assert.Null(model.Subtitle);
+        var row = Assert.Single(model.Rows);
+        Assert.Equal("aucune — cliquer ouvre l'application", row.Text);
+    }
 }

@@ -28,9 +28,7 @@ public class MediaSourceTests
         var r = await new MediaSource(session).ReadAsync(Ctx(), CancellationToken.None);
         Assert.Equal("Bohemian Rhapsody — Queen", r.Text);
         Assert.Equal(Status.Busy, r.Status);
-        Assert.Contains(r.Detail!, d => d.Label == "Application" && d.Text == "Spotify");
         Assert.Equal(new[] { "prev", "toggle", "next" }, r.Actions!.Select(a => a.Id));
-        Assert.Equal("Pause", r.Actions![1].Label);
     }
 
     [Fact]
@@ -40,7 +38,7 @@ public class MediaSourceTests
         var r = await new MediaSource(session).ReadAsync(Ctx(), CancellationToken.None);
         Assert.Equal("Titre", r.Text);
         Assert.Equal(Status.Ok, r.Status);
-        Assert.Equal("Lecture", r.Actions![1].Label);
+        Assert.Equal("play", r.Actions![1].Icon);
     }
 
     [Fact]
@@ -51,6 +49,60 @@ public class MediaSourceTests
         Assert.Equal(Status.Off, r1.Status);
         Assert.Equal("Aucune lecture", r1.Text);
         Assert.Equal(Status.Off, r2.Status);
+    }
+
+    [Fact]
+    public async Task La_position_fait_une_ligne_timeline()
+    {
+        var session = new FakeSession { State = new MediaState("t", "a", "app", true, PositionMs: 151_000, DurationMs: 355_000, PositionAtMs: 1_790_168_101_000) };
+        var r = await new MediaSource(session).ReadAsync(Ctx(), CancellationToken.None);
+        var row = Assert.Single(r.Detail!);
+        Assert.Equal("position", row.Label);
+        Assert.Equal("2:31 / 5:55", row.Text);
+        Assert.Equal(0.425, row.Fraction!.Value, 3);
+        Assert.StartsWith("timeline:", row.Hint);
+        Assert.Equal("timeline:151000:355000:1790168101000", row.Hint);
+    }
+
+    [Fact]
+    public async Task Sans_timeline_pas_de_ligne_position()
+    {
+        var session = new FakeSession { State = new MediaState("t", "a", "app", true) };
+        var r = await new MediaSource(session).ReadAsync(Ctx(), CancellationToken.None);
+        Assert.Empty(r.Detail!);
+    }
+
+    [Fact]
+    public async Task Les_actions_media_n_ont_pas_de_libelle()
+    {
+        var session = new FakeSession { State = new MediaState("t", "a", "app", true) };
+        var r = await new MediaSource(session).ReadAsync(Ctx(), CancellationToken.None);
+        Assert.Equal(3, r.Actions!.Count);
+        Assert.All(r.Actions, a => Assert.Equal("", a.Label));
+        Assert.Equal(new[] { "prev", "pause", "next" }, r.Actions.Select(a => a.Icon));
+    }
+
+    [Fact]
+    public async Task Sans_session_le_clic_ouvre_le_repli()
+    {
+        var opened = new List<string>();
+        var src = new MediaSource(new FakeSession(), open: t => { opened.Add(t); return true; });
+        var r = await src.ReadAsync(Ctx(), CancellationToken.None);
+        var action = Assert.Single(r.Actions!);
+        Assert.Equal("open", action.Id);
+        await src.InvokeAsync("toggle", Ctx(), CancellationToken.None);
+        await src.InvokeAsync("open", Ctx(), CancellationToken.None);
+        Assert.Equal(new[] { "spotify:", "spotify:" }, opened);
+    }
+
+    [Fact]
+    public async Task Le_repli_se_lit_dans_les_params_de_la_cellule()
+    {
+        var opened = new List<string>();
+        var src = new MediaSource(new FakeSession(), open: t => { opened.Add(t); return true; });
+        var ps = new JsonObject { ["fallbackOpen"] = "https://open.spotify.com" };
+        await src.InvokeAsync("toggle", new CellContext("m", ps, null), CancellationToken.None);
+        Assert.Equal(new[] { "https://open.spotify.com" }, opened);
     }
 
     [Fact]
