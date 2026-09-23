@@ -14,7 +14,8 @@ namespace CustomNotch.App;
 public sealed class Controller : IPillHost
 {
     private readonly string _home;
-    private readonly SourceRegistry _registry = CoreSources.Build();
+    private readonly Platform.WindowsMediaSession _media = Platform.WindowsMediaSession.Create();
+    private readonly SourceRegistry _registry;
     private readonly ReadingStore _readings = new();
     private readonly ConfigStore _config;
     private readonly Scheduler _scheduler;
@@ -27,6 +28,7 @@ public sealed class Controller : IPillHost
     public Controller(string home)
     {
         _home = home;
+        _registry = CoreSources.Build(_media);
         _config = new ConfigStore(home, _registry.Schemas);
         _scheduler = new Scheduler(_registry, _readings, () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), Core.Platform.Idle.Ms);
     }
@@ -133,6 +135,7 @@ public sealed class Controller : IPillHost
         _tick.Stop();
         _scheduler.Dispose();
         _config.Dispose();
+        _media.Dispose();
         _tray.Dispose();
         foreach (var p in _pills.Values) p.Close();
         _pills.Clear();
