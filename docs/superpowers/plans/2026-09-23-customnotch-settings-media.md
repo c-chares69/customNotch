@@ -2669,47 +2669,273 @@ git commit -m "feat(app): éditeur de cellule — source, affichage, actions, gr
 
 ---
 
+### Task 10: Livraison comme ClickUp-Extended — scripts, installateur, icône, `--auto`
+
+**Objectif :** customNotch se construit, s'empaquette, se publie et s'installe exactement comme ClickUp-Extended
+(`C:\Users\Coco_FW\Desktop\ClickUp-Extended`). Les scripts sont des COPIES de ceux de ClickUp-Extended, avec les
+substitutions listées ci-dessous et rien d'autre : chaque commentaire d'en-tête, chaque étape, chaque message reste.
+
+**Files:**
+- Replace: `scripts/publish.ps1` (copie de `ClickUp-Extended/scripts/publish.ps1` ; les options `-Shortcut/-Autostart/-Run` disparaissent : c'est `install.ps1` qui installe)
+- Create: `scripts/package.ps1`, `scripts/release.ps1`, `scripts/install.ps1`, `scripts/Install.cmd`, `scripts/uninstall.ps1`, `scripts/install_tasks.ps1`, `scripts/remove_tasks.ps1`, `scripts/installer.iss`, `scripts/make-icon.ps1` (copies)
+- Create: `assets/customnotch.ico`, `assets/customnotch.png` (produits par `make-icon.ps1`)
+- Modify: `src/CustomNotch.App/CustomNotch.App.csproj` (`<ApplicationIcon>..\..\assets\customnotch.ico</ApplicationIcon>`)
+- Modify: `src/CustomNotch.App/App.xaml.cs` (`--auto`), `src/CustomNotch.App/Controller.cs` (`Quit` marque l'arrêt volontaire)
+- Test: `tests/CustomNotch.Core.Tests/SingleInstanceTests.cs` (créer si absent : marqueur `stopped_by_user`)
+
+**Interfaces:**
+- Consumes: `SingleInstance.{MarkStoppedByUser, ClearStoppedByUser, StoppedByUser, IsRunning, Ping, Acquire}` (Core, déjà là), `Autostart.TaskName` (= `App.Name` = « customNotch » : c'est le nom que `install_tasks.ps1` doit donner à la tâche de session), `Core.App.{Name, Id, Version}`.
+- Produces: `dist\customNotch\customNotch.exe` (publish), `dist\customNotch-<version>-setup.exe`, `dist\customNotch-<version>-win64.zip`, `dist\latest.json` (package), release GitHub `v<version>` (release), installation dans `%LOCALAPPDATA%\Programs\customNotch` (install / setup).
+
+#### Substitutions (valables pour TOUS les scripts copiés)
+
+| ClickUp-Extended | customNotch |
+|---|---|
+| `ClickUp - Extended` (nom affiché, dossier, tâche, raccourci) | `customNotch` |
+| `ClickUp - Extended.exe` | `customNotch.exe` |
+| `ClickUp-Extended-<version>-setup.exe` / `-win64.zip` | `customNotch-<version>-setup.exe` / `customNotch-<version>-win64.zip` |
+| `clickup-extended.ico` / `.png` | `customnotch.ico` / `.png` |
+| clé de désinstallation `...\Uninstall\ClickUpExtended` | `...\Uninstall\CustomNotch` |
+| `AppId={{7C1E9B2A-3F4D-4E6B-9A0C-5D2F8E1B4C77}` | `AppId={{4A7D2E61-9B3C-4F58-8E12-6C0B5A9D3F21}` |
+| `AppUserModelID: "DevPilot.ClickUpExtended"` | `AppUserModelID: "DevPilot.CustomNotch"` (= `Core.App.Id`) |
+| `https://github.com/c-chares69/clickup-extended` | `https://github.com/c-chares69/customNotch` |
+| `ClickUpExtended.App\ClickUpExtended.App.csproj` | `CustomNotch.App\CustomNotch.App.csproj` |
+| `CLICKUP_EXTENDED_SIGN_THUMBPRINT` / `_PFX` / `_PASSWORD` | `CUSTOMNOTCH_SIGN_THUMBPRINT` / `_PFX` / `_PASSWORD` |
+| « suivi ClickUp permanent », « suivi du temps ClickUp dans la zone de notification » | « strip de statut et de lancement », « pilules de statut et de lancement sur un bord de l'écran » |
+| runtime .NET 8 Desktop (`8.`, `https://aka.ms/dotnet/8.0/windowsdesktop-runtime-win-x64.exe`, « .NET 8 ») | runtime .NET 10 Desktop (`10.`, `https://aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe`, « .NET 10 ») |
+| `winget install Microsoft.DotNet.DesktopRuntime.8` | `winget install Microsoft.DotNet.DesktopRuntime.10` |
+| Données : « config.json chiffre, journaux, memoires locales » / « (config.json, timers.json, reminders.json, agenda.json, journaux) » / « configuration avec le token chiffré, journaux, mémoires locales » | « config.json, cells.json et sa surcharge locale, secrets.json chiffré, journaux » |
+| Ancienne clé Run `"Multitracking"` | supprimer cette entrée de la liste (ne garder que `$app`, la clé posée par l'ancien `publish.ps1 -Autostart`) |
+| Migration Python (`[InstallDelete]` / `[UninstallDelete]` du dossier `lib`, et le raccourci racine `{userprograms}\...lnk`) | **garder** la suppression du raccourci racine `{userprograms}\customNotch.lnk` (posé par l'ancien `publish.ps1 -Shortcut`), **retirer** tout ce qui concerne `lib` (y compris les deux commentaires) |
+| `# L'outil cue reste un outil de développement...` (publish.ps1) | retirer la ligne (pas de CLI) |
+| `-p:SatelliteResourceLanguages=fr` | garder |
+| Release : « ClickUp - Extended $version » (nom, titre `## ClickUp - Extended`) | « customNotch $version », `## customNotch` |
+| `*Réglages → Système → Mises à jour*` | `*Réglages → Général → Mises à jour*` (la page arrive au plan 3 ; la phrase reste au futur : « ce sera l'adresse du manifeste ») |
+| Publisher `DevPilot` | inchangé |
+
+Tout ce qui n'est pas dans ce tableau reste identique, caractère pour caractère (accents et fautes d'accent
+compris : ces scripts sont écrits en ASCII à certains endroits, on ne « corrige » pas).
+
+- [ ] **Step 1 : l'icône**
+
+`scripts/make-icon.ps1` : copie de celui de ClickUp-Extended (même structure : `Draw-Mark`, tailles, conteneur ICO,
+sortie `.png` 256 px), avec un autre dessin dans `Draw-Mark` — le carré arrondi reste (mêmes coordonnées, dégradé,
+liseré) ; le symbole devient **une pilule** : une capsule blanche horizontale (rectangle aux bouts ronds) de
+`$s*0.62` de large sur `$s*0.24` de haut, centrée en `($s*0.5, $s*0.5)`, remplie de `$ink` ; dedans, de gauche à
+droite : un anneau (cercle de diamètre `$s*0.13`, trait `$s*0.035`, couleur `$base`) centré en `($s*0.34, $s*0.5)`,
+puis deux barres horizontales de `$s*0.20` de long, épaisseur `$s*0.035`, bouts ronds, couleur `$base`, en
+`y = $s*0.455` et `y = $s*0.545`, de `x = $s*0.46` à `x = $s*0.66`. Commentaire d'en-tête réécrit pour décrire
+ce dessin (« la pilule et ses cellules »). Sortie : `assets\customnotch.ico` et `assets\customnotch.png`.
+
+Run: `powershell -ExecutionPolicy Bypass -File scripts\make-icon.ps1` → les deux fichiers existent ; ouvrir le PNG
+(Read) pour vérifier que la pilule est lisible à 256 px.
+
+Dans `CustomNotch.App.csproj`, premier `PropertyGroup` : `<ApplicationIcon>..\..\assets\customnotch.ico</ApplicationIcon>`.
+`dotnet build` : l'exe porte l'icône (`(Get-Item ...customNotch.exe)` n'affiche pas l'icône ; vérifier par
+`[System.Drawing.Icon]::ExtractAssociatedIcon` dans PowerShell si besoin, ou simplement que le build passe).
+
+- [ ] **Step 2 : `--auto` et l'arrêt volontaire**
+
+`App.xaml.cs`, `OnStartup`, à la place du bloc `_instance = new SingleInstance(home); if (!_instance.Acquire()) { ... }` :
+
+```csharp
+        // Lancée par la tâche de surveillance (--auto), une copie s'efface si l'utilisateur a quitté lui-même
+        // depuis le menu de l'icône (marqueur stopped_by_user) ou si l'application tourne déjà. Lancée à la
+        // main, une seconde copie réveille la première (ses réglages) et s'arrête.
+        var auto = e.Args.Contains("--auto");
+        if (auto && (SingleInstance.StoppedByUser(home) || SingleInstance.IsRunning(home)))
+        {
+            Shutdown();
+            return;
+        }
+        _instance = new SingleInstance(home);
+        if (!_instance.Acquire())
+        {
+            if (!auto) SingleInstance.Ping(home, "show");
+            Shutdown();
+            return;
+        }
+        SingleInstance.ClearStoppedByUser(home);
+        Log.Info("app", $"Démarrage {Core.App.Version} (.NET {Environment.Version})");
+```
+
+`Controller.Quit()` (seul chemin de sortie volontaire : le menu du tray) :
+
+```csharp
+    public void Quit()
+    {
+        // Le watchdog (tâche planifiée, --auto) relance l'application quand elle est tombée ; pas quand on l'a
+        // quittée soi-même. Le marqueur est levé au prochain lancement volontaire.
+        SingleInstance.MarkStoppedByUser(_home);
+        Stop();
+        Application.Current.Shutdown();
+    }
+```
+
+(`_home` : le champ existant du Controller qui tient le dossier de données ; s'il s'appelle autrement, utiliser
+son nom ; ajouter `using CustomNotch.Core.Platform;` si besoin.)
+
+Test `tests/CustomNotch.Core.Tests/SingleInstanceTests.cs` (si un fichier de ce nom existe déjà, y ajouter le test) :
+
+```csharp
+    [Fact]
+    public void Le_marqueur_d_arret_volontaire_se_pose_et_se_leve()
+    {
+        var home = Path.Combine(Path.GetTempPath(), "customNotch-tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            Assert.False(SingleInstance.StoppedByUser(home));
+            SingleInstance.MarkStoppedByUser(home);
+            Assert.True(SingleInstance.StoppedByUser(home));
+            SingleInstance.ClearStoppedByUser(home);
+            Assert.False(SingleInstance.StoppedByUser(home));
+        }
+        finally { if (Directory.Exists(home)) Directory.Delete(home, true); }
+    }
+```
+
+- [ ] **Step 3 : les scripts**
+
+Copier depuis `C:\Users\Coco_FW\Desktop\ClickUp-Extended\scripts\` avec les substitutions du tableau :
+`publish.ps1` (remplace l'actuel), `package.ps1`, `release.ps1`, `install.ps1`, `Install.cmd`, `uninstall.ps1`,
+`install_tasks.ps1`, `remove_tasks.ps1`, `installer.iss`. Points d'attention :
+
+- `publish.ps1` : le `dotnet publish` de ClickUp passe `-r win-x64 --self-contained:$([bool]$SelfContained)
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=...
+  -p:DebugType=none -p:SatelliteResourceLanguages=fr` : garder tel quel (le csproj Release de customNotch dit
+  déjà la même chose ; la ligne de commande prime). Le filtre `Where-Object { $_.Path -like "$projectDir*" }`
+  de l'arrêt du processus reste (n'arrête que la copie lancée depuis les sources — l'installée est arrêtée
+  par install.ps1 / l'installateur).
+- `installer.iss` : `[Code]` `RuntimePresent` cherche `10.` ; `RuntimeUrl` .NET 10 ; message « runtime .NET 10
+  Desktop » ; `[Icons]` `AppUserModelID: "DevPilot.CustomNotch"` ; `[InstallDelete]` ne garde que
+  `Type: files; Name: "{userprograms}\{#AppName}.lnk"` avec son commentaire réécrit (« posé par l'ancien
+  scripts\publish.ps1 -Shortcut ») ; pas de `[UninstallDelete]`. `[Setup]` : `SetupIconFile=..\assets\customnotch.ico`.
+  La suppression des données à la désinstallation propose `{userappdata}\customNotch`.
+- `install.ps1` / `install_tasks.ps1` : la tâche de session s'appelle `customNotch` (= `Autostart.TaskName`), la
+  surveillance `customNotch Watchdog`, l'argument `--auto` ; l'entrée `Uninstall\CustomNotch` ;
+  `$lnk.Description = "customNotch - strip de statut et de lancement"`.
+- `release.ps1` : `$exe = dist\customNotch\customNotch.exe` ; assets `customNotch-$version-setup.exe`,
+  `customNotch-$version-win64.zip`, `latest.json` ; notes = section `## $version` de `CHANGELOG.md` (le format
+  `## 0.2.0 - 2026-09-23` de la tâche 9 convient : `IndexOf("## $version")` le trouve).
+
+Run: `powershell -ExecutionPolicy Bypass -File scripts\publish.ps1` → `dist\customNotch\customNotch.exe`, version
+lue. Puis `powershell -ExecutionPolicy Bypass -File scripts\package.ps1 -SkipBuild` → `dist\customNotch-<version>-setup.exe`
+(ISCC est dans `%LOCALAPPDATA%\Programs\Inno Setup 6`), le zip, `latest.json`. NE PAS lancer `release.ps1`, NE PAS
+lancer `install.ps1` ni le setup (c'est l'étape de fin de branche, faite par l'orchestrateur).
+`git status` : `dist/` est ignoré ; `assets/` ne l'est pas (les deux fichiers sont versionnés, comme dans ClickUp-Extended).
+
+- [ ] **Step 4 : vérifications et commit**
+
+`dotnet build CustomNotch.sln` (0 avertissement), `dotnet test CustomNotch.sln` (vert). Relire chaque script
+côte à côte avec l'original (`diff`) : seules les lignes couvertes par le tableau diffèrent.
+
+```powershell
+git add -A
+git commit -m "feat: livraison comme ClickUp-Extended — installateur Inno Setup, archive portable, manifeste, release GitHub, icône, tâche de surveillance (--auto)"
+```
+
+---
+
 ### Task 9: Documentation, exemple, défaut sur ce poste, vérification de bout en bout
+
+(Version révisée : la tâche 10 — livraison comme ClickUp-Extended — est déjà faite ; cette tâche la documente aussi.)
 
 **Files:**
 - Modify: `docs/ARCHITECTURE.md`, `README.md`, `CHANGELOG.md`, `docs/cells.example.json`, `Directory.Build.props` (version 0.2.0)
 
 - [ ] **Step 1: Version et changelog**
 
-`Directory.Build.props` : `<Version>0.2.0</Version>`. `CHANGELOG.md`, en tête :
+`Directory.Build.props` : `<Version>0.2.0</Version>`.
+
+`CHANGELOG.md` : le format devient celui de ClickUp-Extended (`C:\Users\Coco_FW\Desktop\ClickUp-Extended\CHANGELOG.md`) :
+titre `# Journal des versions`, une section `## <version> - <AAAA-MM-JJ>` par version, des puces dont la première
+phrase en gras dit le changement et la suite dit pourquoi / ce que ça change pour l'utilisateur, lignes coupées
+vers 90 colonnes. La section `0.1.0` existante est reformatée sur ce modèle (`## 0.1.0 - 2026-09-22`, ses quatre
+puces gardées, la première phrase de chacune en gras). En tête :
+
 ```markdown
-## 0.2.0 - réglages par l'interface
-- Fenêtre Réglages : pilules (bord, écran, position, échelle), cellules (catalogue de sources, formulaire généré,
-  libellé, glyph, seuils, cadence, actions, groupes), secrets chiffrés, démarrage automatique, thème. Tout s'applique
-  immédiatement ; `cells.json` n'a plus besoin d'être ouvert.
-- Source `media` : ce qui joue (Spotify, navigateur, VLC…), lecture/pause au clic, précédent/suivant dans la carte.
-- Groupe « Système » par défaut (CPU, mémoire, disque, réseau, batterie dans une seule cellule).
-- Le clic sur une cellule suit l'action par défaut de sa source (ouvrir, lecture/pause) quand la config n'en fixe pas.
-- Les params des cellules sont vérifiés d'après le schéma de la source (requis, nombre, URL, choix).
+## 0.2.0 - 2026-09-23
+
+- **Tout se règle dans la fenêtre Réglages.** Pilules (bord, écran, position, échelle), cellules
+  (catalogue de sources, formulaire généré depuis le schéma de la source, libellé, glyph, seuils,
+  cadence, actions, groupes), secrets chiffrés, démarrage automatique, thème. Chaque changement
+  s'applique tout de suite ; `cells.json` n'a plus besoin d'être ouvert - il reste lisible et
+  synchronisable, et un refus (valeur invalide) s'affiche en tête de l'éditeur sans rien perdre.
+- **Source `media`.** Ce qui joue (Spotify, navigateur, VLC…), lecture/pause au clic, précédent /
+  suivant dans la carte ; grisée quand rien ne joue.
+- **Groupe « Système » par défaut.** CPU, mémoire, disque, réseau, batterie dans une seule cellule :
+  le CPU en tête, le reste dans la carte.
+- **Le clic sur une cellule suit l'action par défaut de sa source** (ouvrir, lecture/pause) quand la
+  configuration n'en fixe pas.
+- **Les params des cellules sont vérifiés d'après le schéma de la source** (requis, nombre, URL, choix).
+- **Livraison comme ClickUp-Extended.** `scripts\package.ps1` produit l'installateur Inno Setup
+  (`customNotch-<version>-setup.exe`, aucun droit administrateur, runtime .NET 10 Desktop posé s'il
+  manque), l'archive portable avec `Install.cmd`, et `latest.json`, le manifeste des mises à jour ;
+  `scripts\release.ps1` publie la release GitHub. L'installation pose deux tâches planifiées :
+  **customNotch** à l'ouverture de session et **customNotch Watchdog** toutes les 15 minutes, qui
+  respecte un « Quitter » volontaire (`--auto`). Icône de l'application (`assets\customnotch.ico`).
 ```
 
 - [ ] **Step 2: ARCHITECTURE.md**
 
-Mettre à jour : l'arborescence (§2 — tous les fichiers nouveaux de ce plan avec une ligne de commentaire chacun, dont `Shared/Controls.xaml` et `Platform/Autostart.cs` comme copies) ; §3 flux de données (ajouter le sens « Réglages → ConfigEditor → fichiers → ConfigStore.Changed → tout le reste ») ; §4 (`DefaultAction`, `Group`, validation typée, légende texte) ; §5 Sources (ligne `media` : `IMediaSession`/`WindowsMediaSession`, Busy/Ok/Off, actions) ; nouvelle section **« Réglages »** (fenêtre, pages, `SchemaForm`, routage partagé/local/secrets, annulation sur refus, en-tête réécrit, ce qui n'est pas dans l'UI : rien) ; §7 erreurs (la ligne « une modification refusée par l'UI est annulée et affichée ») ; § « Ce qui vient ensuite » = plan 3 (Claude Code, ClickUp via ClickUp-Extended, updater, installateur, glisser-déposer, position de lecture).
+Mettre à jour : l'arborescence (§2 — tous les fichiers nouveaux des tâches 1 à 8 et 10, une ligne de commentaire
+chacun ; `Shared/Controls.xaml` et `Platform/Autostart.cs` signalés comme copies de ClickUp-Extended ; le bloc
+`scripts/` et `assets/` reprend mot pour mot la forme de celui de `ClickUp-Extended/docs/ARCHITECTURE.md` §2 :
+`publish.ps1 # dotnet publish → dist\customNotch\ (signature facultative)`, `package.ps1 # installateur Inno Setup +
+zip portable + latest.json`, `installer.iss, install_tasks.ps1, remove_tasks.ps1`, `install.ps1, Install.cmd,
+uninstall.ps1`, `make-icon.ps1 # dessine assets\customnotch.ico`, `release.ps1 # release GitHub : setup, zip,
+manifeste`) ; la ligne « Données utilisateur (hors dépôt) » sur le modèle de ClickUp-Extended : `%APPDATA%\customNotch\
+config.json, cells.json, cells.<machine>.json, secrets.json, logs\, stopped_by_user` + surcharge `--home`,
+`CUSTOMNOTCH_HOME`, mode portable ; §3 flux de données (ajouter le sens « Réglages → ConfigEditor → fichiers →
+ConfigStore.Changed → tout le reste », et « un rechargement au contenu identique ne notifie pas ») ; §4
+(`DefaultAction`, `Group`, validation typée, légende texte) ; §5 Sources (ligne `media` : `IMediaSession` /
+`WindowsMediaSession`, Busy/Ok/Off, actions) ; nouvelle section **« Réglages »** (fenêtre, pages, `Bricks`,
+`SchemaForm`, routage partagé/local/secrets, annulation sur refus et valeur conservée dans le champ, focus restauré
+après reconstruction, en-tête réécrit, ce qui n'est pas dans l'UI : rien) ; nouvelle section **« Livraison »**
+(publish → package → release → install ; tâches planifiées, `--auto` et `stopped_by_user` ; installation
+silencieuse `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART` ; `latest.json` : le lecteur de manifeste arrive au plan 3) ;
+§7 erreurs (la ligne « une modification refusée par l'UI est annulée et affichée ») ; § « Ce qui vient ensuite » =
+plan 3 (Claude Code, ClickUp via ClickUp-Extended, mises à jour automatiques dans l'application, diagnostic
+`--report`, glisser-déposer, position de lecture).
 
 - [ ] **Step 3: README et exemple**
 
-`README.md` : « Configuration » commence par « Tout se règle dans **Réglages…** (icône du tray, ou clic droit sur une pilule) » ; le paragraphe sur les trois fichiers reste (c'est ce que Réglages écrit), avec la phrase « `cells.json` reste lisible et synchronisable ; l'éditer à la main reste possible mais ses commentaires disparaissent à la première sauvegarde par l'interface ». Tableau des sources : ajouter `media`. `docs/cells.example.json` : remplacer les quatre cellules système visibles par le groupe `sys` + enfants masqués (comme le défaut), ajouter `media`, garder les exemples `http` et `shell` ; `DocsExampleTests` doit rester vert.
+`README.md`, section « Installation » : remplacer entièrement par la structure de celle de ClickUp-Extended
+(`README.md` lignes « ## Installation » à « ### Signature de l'exécutable » incluse, puis le paragraphe « Publier
+une version ») avec les mêmes substitutions que les scripts (nom, exe, `.NET 10`, `DesktopRuntime.10`,
+`Microsoft.DotNet.SDK.10`, `CUSTOMNOTCH_SIGN_*`, dépôt `c-chares69/customNotch`, données « config.json,
+cells.json et sa surcharge locale, secrets.json chiffré, journaux ») ; retirer ce qui concerne la migration
+Python et le dossier `lib` ; le paragraphe « Mises à jour » dit que le manifeste est produit et publié dès
+maintenant et que la vérification dans l'application (*Réglages → Général → Mises à jour*) arrive au plan 3.
+Retirer les phrases « L'installateur … arrive avec le plan 2 » et l'ancien bloc `publish.ps1 -Shortcut -Autostart -Run`.
+Garder la ligne « En développement, `dotnet run --project src/CustomNotch.App` suffit ».
+
+Section « Configuration » : commence par « Tout se règle dans **Réglages…** (icône du tray, ou clic droit sur
+une pilule) » ; le paragraphe sur les trois fichiers reste (c'est ce que Réglages écrit), avec la phrase
+« `cells.json` reste lisible et synchronisable ; l'éditer à la main reste possible mais ses commentaires
+disparaissent à la première sauvegarde par l'interface ». Tableau des sources : ajouter `media`.
+
+`docs/cells.example.json` : remplacer les quatre cellules système visibles par le groupe `sys` + enfants masqués
+(comme le défaut), ajouter `media`, garder les exemples `http` et `shell` ; `DocsExampleTests` doit rester vert.
 
 - [ ] **Step 4: Ce poste**
 
-Sauvegarder `%APPDATA%\customNotch\cells.json` en `cells.json.avant-0.2` puis le supprimer : le prochain lancement écrit le nouveau défaut. Ne pas toucher `secrets.json` ni la surcharge locale.
+Sauvegarder `%APPDATA%\customNotch\cells.json` en `cells.json.avant-0.2` puis le supprimer : le prochain
+lancement écrit le nouveau défaut. Ne pas toucher `secrets.json` ni la surcharge locale.
 
 - [ ] **Step 5: Vérification complète**
 
-Run: `dotnet build CustomNotch.sln` (0 avertissement), `dotnet test CustomNotch.sln` (tout vert), `powershell -ExecutionPolicy Bypass -File scripts\publish.ps1 -Run`.
-Écran (si libre) : la pilule par défaut (Système, Média, ClickUp) ; Réglages depuis le tray ; thème clair puis sombre (fenêtre, catalogue, menus) ; une lecture Spotify/YouTube visible dans Média. Tuer l'app à la fin, relancer depuis le raccourci du menu Démarrer.
+Run: `dotnet build CustomNotch.sln` (0 avertissement), `dotnet test CustomNotch.sln` (tout vert),
+`powershell -ExecutionPolicy Bypass -File scripts\package.ps1` (publie puis produit setup, zip, `latest.json`
+en 0.2.0 ; vérifier les trois fichiers dans `dist\` et que `latest.json` dit `"version": "0.2.0"`).
+NE PAS lancer `release.ps1`, `install.ps1` ni le setup : c'est l'étape de fin de branche. Pas de vérification
+écran (bureau occupé) : le dire dans le rapport.
 
 - [ ] **Step 6: Commit**
 
 ```powershell
 git add -A
-git commit -m "docs: réglages par l'interface, média, groupe Système ; version 0.2.0"
+git commit -m "docs: réglages par l'interface, média, groupe Système, livraison ; version 0.2.0"
 ```
 
 ---
@@ -2718,9 +2944,9 @@ git commit -m "docs: réglages par l'interface, média, groupe Système ; versio
 
 - **Couverture de la spec** — §1 décisions : forme (T5, T7), application immédiate (T5–T8 : anti-rebond 300 ms), `ConfigEditor` (T3), en-tête réécrit (T3), secrets (T3, T6, T8), `DefaultAction` (T1), média (T2, T4), défaut (T2), pas de glisser-déposer (T7 : ↑↓), galerie (T8). §2 : T1 (schéma, validation, résolution du clic, légende), T3 (`ConfigEditor`). §3 : T5 (fenêtre, Général, Sources), T6 (`SchemaForm`), T7 (arbre, pilule, catalogue), T8 (cellule). §4 : T2, T4. §5 : T2, T9. §6 tests : T1, T2, T3, T6 ; vérifs écran T4, T5, T7, T8, T9 ; docs T9.
 - **Types** — `ConfigEditor(ConfigStore, IReadOnlyDictionary<string, SourceSchema>)` (T3) est construit ainsi dans `Controller` (T5) ; `SettingsContext(Store, Editor, Registry)` (T5) consommé par T6–T8 ; `SchemaForm.Build(schema, params, onChange, onSecret)` (T6) appelé avec cette signature en T8 ; `PillEditor(ctx, pill, Action<Action> run)` et `CellEditor(ctx, cell, Action<Action> run)` (T7/T8) reçoivent `PillsPage.Try` ; `IMediaSession`/`MediaState` (T2) implémentés en T4 ; `CoreSources.Build(IMediaSession?)` (T2) appelé en T4 ; `IPillHost.Schema` (T1) utilisé par `PillWindow` (T1).
-- **Ordre d'exécution** — T1, T2, T3, T4, T5, T6, T7, T8, T9 : les tests de T3 s'appuient sur le défaut de T2.
+- **Ordre d'exécution** — T1, T2, T3, T4, T5, T6, T7, T8, T10, T9 : les tests de T3 s'appuient sur le défaut de T2 ; T9 documente les scripts de T10 (ajoutée en cours d'exécution : livrer et installer comme ClickUp-Extended).
 - **Points d'attention** — le style `TreeList` hérite de `NavList` : `BasedOn` sur une clé du même dictionnaire nécessite que `NavList` soit déclaré avant ; les styles copiés (`Controls.xaml`) référencent `Border`, `Surface`, `Subtle`, `Accent`, `OnAccent`, `Track`, `Danger` — tous posés par `Theme.Apply` ; `Registry` sur `net10.0` (T5, `Autostart`) passe l'analyseur grâce aux gardes `OperatingSystem.IsWindows()` ; WinRT (T4) : si `await` sur `IAsyncOperation` ne compile pas, `.AsTask()`.
 
 ## Plan 3 (à écrire ensuite)
 
-Claude Code (identifiants, endpoint usage, renouvellement `claude -p`, hooks, serveur d'événements, exe hook, connexion), ClickUp (endpoint local dans ClickUp-Extended — sous-projet de l'autre dépôt — puis la source), updater (`Updates.cs` repris, `latest.json` sur les releases), diagnostic `--report`, installateur Inno Setup + tâches planifiées, icône `.ico`, page Sources remplie.
+Claude Code (identifiants, endpoint usage, renouvellement `claude -p`, hooks, serveur d'événements, exe hook, connexion), ClickUp (endpoint local dans ClickUp-Extended — sous-projet de l'autre dépôt — puis la source), mises à jour dans l'application (`Updates.cs` repris, `latest.json` déjà publié sur les releases), diagnostic `--report`, page Sources remplie.
