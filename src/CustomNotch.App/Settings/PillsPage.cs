@@ -14,11 +14,19 @@ public sealed class PillsPage : PageBase
     private readonly EditorBanner _banner = new();
     private readonly Button _hide;
     private (string Kind, string Id)? _selected;
+    /// <summary>Vrai pendant que Refresh() reconstruit l'arbre et y restaure la sélection : le gestionnaire de
+    /// SelectionChanged se tait alors, pour que Refresh() reste la seule à décider de reconstruire l'éditeur
+    /// (un seul ShowEditor() par rafraîchissement, jamais deux).</summary>
+    private bool _refreshing;
 
     public PillsPage(SettingsContext ctx) : base(ctx, "Pilules & cellules", "Chaque pilule est ancrée à un bord ; ses cellules lisent une source. Tout s'applique immédiatement.")
     {
         _tree.SetResourceReference(StyleProperty, "TreeList");
-        _tree.SelectionChanged += (_, _) => { if (_tree.SelectedItem is ListBoxItem it && it.Tag is (string kind, string id)) { _selected = (kind, id); ShowEditor(); } };
+        _tree.SelectionChanged += (_, _) =>
+        {
+            if (_refreshing) return;
+            if (_tree.SelectedItem is ListBoxItem it && it.Tag is (string kind, string id)) { _selected = (kind, id); ShowEditor(); }
+        };
 
         var tools = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
         tools.Children.Add(Btn("+ Pilule", () => Try(() => Select("pill", Ctx.Editor.AddPill("right")))));
@@ -61,30 +69,40 @@ public sealed class PillsPage : PageBase
         Refresh();
     }
 
+    /// <summary>Reconstruit l'arbre depuis le fichier et y restaure la sélection, puis reconstruit l'éditeur — une
+    /// seule fois, que la sélection ait changé ou non (l'éditeur doit refléter le fichier). Poser _tree.SelectedItem
+    /// ici déclenche SelectionChanged, mais _refreshing le fait taire : sinon l'éditeur serait construit une
+    /// première fois par ce déclenchement, puis une seconde par l'appel explicite à ShowEditor() ci-dessous.</summary>
     public override void Refresh()
     {
         var file = Ctx.Store.Current;
-        _tree.Items.Clear();
-        var groups = file.AllCells().Where(c => c.IsGroup).ToList();
-        var childIds = groups.SelectMany(g => g.Children!).ToHashSet();
-        foreach (var pill in file.Pills)
+        _refreshing = true;
+        try
         {
-            _tree.Items.Add(Item("pill", pill.Id, $"Pilule « {pill.Id} »  ·  {Edge(pill.Edge)}", 0, pill.Visible, null, true));
-            foreach (var cell in pill.Cells.Where(c => !childIds.Contains(c.Id)))
+            _tree.Items.Clear();
+            var groups = file.AllCells().Where(c => c.IsGroup).ToList();
+            var childIds = groups.SelectMany(g => g.Children!).ToHashSet();
+            foreach (var pill in file.Pills)
             {
-                _tree.Items.Add(Item("cell", cell.Id, cell.Label ?? cell.Id, 1, cell.Visible, cell.Glyph, false));
-                if (cell.IsGroup)
-                    foreach (var childId in cell.Children!)
-                        if (file.Cell(childId) is { } child)
-                            _tree.Items.Add(Item("cell", child.Id, child.Label ?? child.Id, 2, child.Visible, child.Glyph, false));
+                _tree.Items.Add(Item("pill", pill.Id, $"Pilule « {pill.Id} »  ·  {Edge(pill.Edge)}", 0, pill.Visible, null, true));
+                foreach (var cell in pill.Cells.Where(c => !childIds.Contains(c.Id)))
+                {
+                    _tree.Items.Add(Item("cell", cell.Id, cell.Label ?? cell.Id, 1, cell.Visible, cell.Glyph, false));
+                    if (cell.IsGroup)
+                        foreach (var childId in cell.Children!)
+                            if (file.Cell(childId) is { } child)
+                                _tree.Items.Add(Item("cell", child.Id, child.Label ?? child.Id, 2, child.Visible, child.Glyph, false));
+                }
             }
+            if (_selected is { } sel)
+            {
+                var match = _tree.Items.OfType<ListBoxItem>().FirstOrDefault(i => i.Tag is (string k, string id) && k == sel.Kind && id == sel.Id);
+                if (match is not null) _tree.SelectedItem = match; else _selected = null;
+            }
+            if (_selected is null && _tree.Items.Count > 0) _tree.SelectedIndex = 0;
+            if (_tree.SelectedItem is ListBoxItem picked && picked.Tag is (string k2, string id2)) _selected = (k2, id2);
         }
-        if (_selected is { } sel)
-        {
-            var match = _tree.Items.OfType<ListBoxItem>().FirstOrDefault(i => i.Tag is (string k, string id) && k == sel.Kind && id == sel.Id);
-            if (match is not null) _tree.SelectedItem = match; else _selected = null;
-        }
-        if (_selected is null && _tree.Items.Count > 0) _tree.SelectedIndex = 0;
+        finally { _refreshing = false; }
         ShowEditor();
     }
 
@@ -109,7 +127,14 @@ public sealed class PillsPage : PageBase
     private void ShowEditor()
     {
         var file = Ctx.Store.Current;
-        if (_selected is not { } sel) { _editor.Content = Ui.Text("Choisis une pilule ou une cellule.", 13, null, "Muted"); return; }
+        if (_selected is not { } sel)
+        {
+            _editor.Content = Ui.Text("Choisis une pilule ou une cellule.", 13, null, "Muted");
+            _hide.Content = "Masquer";
+            _hide.IsEnabled = false;
+            return;
+        }
+        _hide.IsEnabled = true;
         if (sel.Kind == "pill")
         {
             var pill = file.Pills.FirstOrDefault(p => p.Id == sel.Id);

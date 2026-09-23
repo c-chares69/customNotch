@@ -116,7 +116,9 @@ public static class SchemaForm
         }
     }
 
-    /// <summary>Un champ texte à anti-rebond (300 ms) ; rouge tant qu'un nombre attendu n'en est pas un.</summary>
+    /// <summary>Un champ texte à anti-rebond (300 ms) ; rouge tant qu'un nombre attendu n'en est pas un. Au démontage,
+    /// une valeur en attente est validée tout de suite plutôt que perdue ou écrite à l'aveugle après coup sur un
+    /// éditeur qui n'existe plus.</summary>
     private static TextBox Text(SchemaField field, JsonObject? parameters, Action<string> commit)
     {
         var box = new TextBox { Text = InitialText(field, parameters), Width = 340, HorizontalAlignment = HorizontalAlignment.Left };
@@ -134,6 +136,7 @@ public static class SchemaForm
         timer.Tick += (_, _) => Flush();
         box.TextChanged += (_, _) => { timer.Stop(); timer.Start(); };
         box.LostFocus += (_, _) => Flush();
+        box.Unloaded += (_, _) => { if (timer.IsEnabled) Flush(); };
         return box;
     }
 }

@@ -52,7 +52,9 @@ public sealed class PillEditor : UserControl
 
     /// <summary>Un curseur qui n'écrit qu'au relâchement (ou 300 ms après un changement au clavier) : pas une écriture par
     /// pixel. <paramref name="fmt"/> formate la valeur affichée (pourcentage pour une position, « ×1,0 » pour une
-    /// échelle) — un curseur d'échelle à 0,5 ne doit pas afficher « 50 % ».</summary>
+    /// échelle) — un curseur d'échelle à 0,5 ne doit pas afficher « 50 % ». Au démontage (changement de sélection ou de
+    /// page pendant les 300 ms), une valeur en attente est validée tout de suite plutôt que perdue ou écrite à l'aveugle
+    /// après coup sur un éditeur qui n'existe plus.</summary>
     private static UIElement Slider(double value, double min, double max, double step, Action<double> commit, Func<double, string> fmt)
     {
         var panel = new DockPanel { Width = 360, HorizontalAlignment = HorizontalAlignment.Left };
@@ -64,6 +66,7 @@ public sealed class PillEditor : UserControl
         void Flush() { timer.Stop(); if (Math.Abs(slider.Value - last) > 1e-9) { last = slider.Value; commit(slider.Value); } }
         timer.Tick += (_, _) => Flush();
         slider.ValueChanged += (_, e) => { label.Text = fmt(e.NewValue); timer.Stop(); timer.Start(); };
+        slider.Unloaded += (_, _) => { if (timer.IsEnabled) Flush(); };
         panel.Children.Add(label);
         panel.Children.Add(slider);
         return panel;

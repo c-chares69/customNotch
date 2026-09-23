@@ -75,7 +75,9 @@ public abstract class PageBase : UserControl
         return combo;
     }
 
-    /// <summary>Un champ texte qui rappelle onChange 300 ms après la dernière frappe (et à la perte du focus).</summary>
+    /// <summary>Un champ texte qui rappelle onChange 300 ms après la dernière frappe (et à la perte du focus). Au
+    /// démontage, une valeur en attente est validée tout de suite plutôt que perdue ou écrite à l'aveugle après coup
+    /// sur un éditeur qui n'existe plus.</summary>
     protected static TextBox Debounced(string initial, Action<string> onChange, double width = 360)
     {
         var box = new TextBox { Text = initial, Width = width, HorizontalAlignment = HorizontalAlignment.Left };
@@ -85,6 +87,7 @@ public abstract class PageBase : UserControl
         timer.Tick += (_, _) => Flush();
         box.TextChanged += (_, _) => { timer.Stop(); timer.Start(); };
         box.LostFocus += (_, _) => Flush();
+        box.Unloaded += (_, _) => { if (timer.IsEnabled) Flush(); };
         return box;
     }
 
