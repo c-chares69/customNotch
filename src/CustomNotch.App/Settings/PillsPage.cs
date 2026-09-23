@@ -12,7 +12,6 @@ public sealed class PillsPage : PageBase
 {
     private readonly ListBox _tree = new();
     private readonly ContentControl _editor = new();
-    private readonly EditorBanner _banner = new();
     private readonly Button _hide;
     private (string Kind, string Id)? _selected;
     /// <summary>Vrai pendant que Refresh() reconstruit l'arbre et y restaure la sélection : le gestionnaire de
@@ -44,7 +43,7 @@ public sealed class PillsPage : PageBase
         left.Children.Add(Card(_tree));
 
         var right = new StackPanel();
-        right.Children.Add(_banner);
+        right.Children.Add(Banner);
         right.Children.Add(_editor);
 
         var grid = new Grid();
@@ -55,13 +54,6 @@ public sealed class PillsPage : PageBase
         grid.Children.Add(right);
         Body.Children.Add(grid);
         OnStoreChanged(Refresh);
-    }
-
-    /// <summary>Exécute une opération de l'éditeur ; un refus s'affiche, une réussite efface le bandeau.</summary>
-    public void Try(Action op)
-    {
-        try { op(); _banner.Clear(); }
-        catch (ConfigException ex) { _banner.Show(ex.Message); }
     }
 
     public void Select(string kind, string id)
@@ -207,7 +199,7 @@ public sealed class PillsPage : PageBase
     private void AddCell()
     {
         var pillId = PillOfSelection() ?? Ctx.Store.Current.Pills.FirstOrDefault()?.Id;
-        if (pillId is null) { _banner.Show("Ajoute d'abord une pilule."); return; }
+        if (pillId is null) { Banner.Show("Ajoute d'abord une pilule."); return; }
         var type = SourceCatalogDialog.Pick(Window.GetWindow(this)!, Ctx.Registry);
         if (type is null) return;
         Try(() => Select("cell", Ctx.Editor.AddCell(pillId, type)));

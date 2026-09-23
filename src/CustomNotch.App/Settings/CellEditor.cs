@@ -15,6 +15,8 @@ public sealed class CellEditor : UserControl
     private static readonly (string, string)[] Refreshes = { ("", "Par défaut"), ("1s", "1 s"), ("2s", "2 s"), ("5s", "5 s"), ("30s", "30 s"), ("1m", "1 min"), ("5m", "5 min"), ("1h", "1 h") };
     private static readonly (string, string)[] ClickKinds = { ("", "Ouvrir la carte"), ("default", "Action par défaut de la source"), ("open", "Ouvrir une URL, un fichier, une app"), ("shell", "Lancer une commande"), ("source", "Une action de la source") };
     private static readonly (string, string)[] ActionKinds = { ("open", "Ouvrir…"), ("shell", "Commande…"), ("source", "Action de la source") };
+    private static readonly (string, string)[] Captions = { ("", "Selon la source"), ("on", "Toujours"), ("off", "Jamais") };
+    private static readonly (string, string)[] Activities = { ("", "Par défaut"), ("dot", "Pastille seule"), ("ring", "Anneau animé") };
 
     private readonly SettingsContext _ctx;
     private readonly CellConfig _cell;
@@ -110,6 +112,8 @@ public sealed class CellEditor : UserControl
         var stack = new StackPanel();
         stack.Children.Add(Row("Libellé", Debounced(_cell.Label ?? "", v => Set(c => { if (v.Length == 0) c.Remove("label"); else c["label"] = v; }), name: "label")));
         stack.Children.Add(Row("Glyph", GlyphGallery.Build(_cell.Glyph, g => Set(c => { if (g is null) c.Remove("glyph"); else c["glyph"] = g; }))));
+        stack.Children.Add(Row("Légende sous la cellule", Combo(Captions, _cell.Caption switch { null => "", true => "on", false => "off" }, v => Set(c => { if (v.Length == 0) c.Remove("caption"); else c["caption"] = v == "on"; }))));
+        stack.Children.Add(Row("Activité", Combo(Activities, _cell.Activity ?? "", v => Set(c => { if (v.Length == 0) c.Remove("activity"); else c["activity"] = v; }))));
         if (!_cell.IsGroup)
         {
             stack.Children.Add(Row("Type de rendu", Combo(Kinds, _cell.Kind ?? "", v => Set(c => { if (v.Length == 0) c.Remove("kind"); else c["kind"] = v; }))));

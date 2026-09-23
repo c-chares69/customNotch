@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using CustomNotch.Core.Config;
 
 namespace CustomNotch.App.Settings;
 
@@ -9,6 +10,10 @@ namespace CustomNotch.App.Settings;
 public abstract class PageBase : UserControl
 {
     protected readonly StackPanel Body = new();
+    /// <summary>Le bandeau de refus de configuration, commun à toute page qui écrit via ConfigEditor. Chaque page
+    /// l'insère où elle veut dans sa propre mise en page (en tête pour GeneralPage, à côté de l'éditeur pour
+    /// PillsPage) ; c'est Try() ci-dessous qui la remplit et la vide.</summary>
+    protected readonly EditorBanner Banner = new();
     private readonly List<Action> _detach = new();
 
     protected PageBase(SettingsContext ctx, string title, string subtitle = "")
@@ -46,6 +51,13 @@ public abstract class PageBase : UserControl
     {
         foreach (var undo in _detach) undo();
         _detach.Clear();
+    }
+
+    /// <summary>Exécute une opération de l'éditeur ; un refus s'affiche dans Banner, une réussite l'efface.</summary>
+    protected void Try(Action op)
+    {
+        try { op(); Banner.Clear(); }
+        catch (ConfigException ex) { Banner.Show(ex.Message); }
     }
 
     /// <summary>Briques déléguées à Bricks (partagées avec les éditeurs, qui ne sont pas des pages) : mêmes

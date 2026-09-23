@@ -61,4 +61,30 @@ internal static class Bricks
         b.Click += (_, _) => click();
         return b;
     }
+
+    /// <summary>Un curseur qui n'écrit qu'au relâchement (ou 300 ms après un changement au clavier) : pas une écriture par
+    /// pixel. <paramref name="fmt"/> formate la valeur affichée (pourcentage pour une position, « ×1,0 » pour une
+    /// échelle, « 120 % » pour une échelle de carte) — un curseur d'échelle à 0,5 ne doit pas afficher « 50 % ». Au
+    /// démontage (changement de sélection ou de page pendant les 300 ms), une valeur en attente est validée tout de
+    /// suite plutôt que perdue ou écrite à l'aveugle après coup sur un éditeur qui n'existe plus. <paramref name="name"/>
+    /// (facultatif) pose x:Name : comme pour CellEditor, PillsPage.ShowEditor() s'en sert pour retrouver le même
+    /// curseur dans l'éditeur reconstruit après une écriture (300 ms après la dernière flèche au clavier) et y rendre
+    /// le focus — sans ça, les flèches perdent le focus au milieu d'un réglage.</summary>
+    public static UIElement Slider(double value, double min, double max, double step, Action<double> commit, Func<double, string> fmt, string? name = null)
+    {
+        var panel = new DockPanel { Width = 360, HorizontalAlignment = HorizontalAlignment.Left };
+        var slider = new System.Windows.Controls.Slider { Minimum = min, Maximum = max, Value = value, TickFrequency = step, IsSnapToTickEnabled = true, VerticalAlignment = VerticalAlignment.Center };
+        if (name is { Length: > 0 }) slider.Name = name;
+        var label = Ui.Text(fmt(value), 12, null, "Muted"); label.Width = 56; label.Margin = new Thickness(10, 0, 0, 0); label.VerticalAlignment = VerticalAlignment.Center;
+        DockPanel.SetDock(label, Dock.Right);
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
+        var last = value;
+        void Flush() { timer.Stop(); if (Math.Abs(slider.Value - last) > 1e-9) { last = slider.Value; commit(slider.Value); } }
+        timer.Tick += (_, _) => Flush();
+        slider.ValueChanged += (_, e) => { label.Text = fmt(e.NewValue); timer.Stop(); timer.Start(); };
+        slider.Unloaded += (_, _) => { if (timer.IsEnabled) Flush(); };
+        panel.Children.Add(label);
+        panel.Children.Add(slider);
+        return panel;
+    }
 }
