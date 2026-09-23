@@ -313,7 +313,7 @@ sans implémentation (tests, un autre OS) la source rend simplement `Off`.
   **70 px**, coins libres **20 px**, fillets inversés **38,7 px**, anneau **44 px**, légende
   **15 px** (semi-gras, hauteur réservée 18 px), écart entre cellules 14 px, padding interne de
   la pilule 18 px de chaque côté du corps. Carte : largeur max **246 px**, rayon **16 px**,
-  padding **16 px**, queue **32 × 36 px**.
+  padding **16 px**, posée à **8 px** de la pilule, sans queue.
 - **`PillShape.Build`** dessine la silhouette pour le bord droit (un `StreamGeometry` : le
   corps aux coins arrondis côté libre, et deux fillets inversés côté écran — le carré au-dessus
   du corps moins un quart de cercle, comme le `::before` de codenotch), puis applique une
@@ -332,8 +332,8 @@ sans implémentation (tests, un autre OS) la source rend simplement `Off`.
   et recalcule sur `SystemEvents.DisplaySettingsChanged`.
 - **`PillWindow`** — une fenêtre par pilule : transparente, `Topmost`, `ShowActivated = false`,
   `WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW` posés après `SourceInitialized` (hors barre des tâches,
-  hors Alt-Tab). Elle réserve, côté libre, la place de la carte et de sa queue : les deux sont
-  dessinées **dans la même fenêtre** que la pilule, pour ne jamais gérer de z-order. Les
+  hors Alt-Tab). Elle réserve, côté libre, la place de la carte : elle est dessinée **dans la
+  même fenêtre** que la pilule, pour ne jamais gérer de z-order. Les
   cellules visibles sont réutilisées par id (`RebuildCells`) tant que leur source ne change pas,
   pour ne pas couper une animation en cours.
 - **Drag** : une poignée apparaît au survol du bord libre de la pilule ; `OnDragMove` suit le
@@ -349,8 +349,8 @@ sans implémentation (tests, un autre OS) la source rend simplement `Off`.
   groupe (label, légende, fraction, l'indication du premier `Detail`), les boutons de la config
   (`actions.card`) puis ceux déclarés par la source (`Reading.Actions`, dont `prev`/`toggle`/
   `next` du média), une notice de péremption si la cellule est périmée. `PillWindow.PlaceCard`
-  la centre sur la cellule côté libre, bornée à la fenêtre ; la queue chevauche la carte de
-  4 px pour ne laisser aucun jour.
+  la centre sur la cellule côté libre, bornée à la fenêtre, à 8 px de la pilule (sans queue
+  vers la cellule : le triangle a été retiré en 0.2.0).
 - **Plein écran** (`FullScreenDetector`) : au tic d'une seconde (`Controller._tick`), la
   fenêtre au premier plan est comparée aux limites de l'écran de la pilule (le bureau et le
   shell — `Progman`, `WorkerW`, `Shell_TrayWnd` — ne comptent jamais). La visibilité de

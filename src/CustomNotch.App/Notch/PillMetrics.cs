@@ -13,7 +13,6 @@ public sealed record PillMetrics(double Scale)
     public double Caption => 18 * Scale;
     public double Gap => 14 * Scale;
     public double CardWidth => 246;
-    public double Tail => 32;
     public double CardGap => 8;
 
     /// <summary>La longueur du corps pour n cellules ; une pilule vide garde la place d'une cellule.</summary>

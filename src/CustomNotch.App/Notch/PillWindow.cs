@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -49,7 +48,6 @@ public sealed class PillWindow : Window
         _canvas.Children.Add(_cells);
         _canvas.Children.Add(_grip);
         _card = new HoverCard(host, _m);
-        _canvas.Children.Add(_card.Tail);
         _canvas.Children.Add(_card);
         _open.Tick += (_, _) => { _open.Stop(); if (_pending is { } p) OpenCard(p); };
         Content = _canvas;
@@ -108,7 +106,7 @@ public sealed class PillWindow : Window
     {
         RebuildCells();
         var extent = _m.Extent(CellCount);
-        var reserve = _m.CardWidth + _m.Tail + _m.CardGap;
+        var reserve = _m.CardWidth + _m.CardGap;
         _shape.Data = PillShape.Build(_m, Pill.Edge, CellCount);
         if (Vertical)
         {
@@ -156,7 +154,7 @@ public sealed class PillWindow : Window
 
     private void MoveTo(Rect pill)
     {
-        var reserve = _m.CardWidth + _m.Tail + _m.CardGap;
+        var reserve = _m.CardWidth + _m.CardGap;
         var extent = _m.Extent(CellCount);
         (Left, Top) = Pill.Edge switch
         {
@@ -339,7 +337,9 @@ public sealed class PillWindow : Window
         PlaceCard(host);
     }
 
-    /// <summary>La carte côté libre, centrée sur la cellule (bornée à la fenêtre), la queue entre les deux.</summary>
+    /// <summary>La carte côté libre, centrée sur la cellule (bornée à la fenêtre), à CardGap de la pilule — sans
+    /// queue vers la cellule : le triangle a été jugé laid, et la carte s'ouvre assez près pour qu'on sache d'où
+    /// elle vient.</summary>
     private void PlaceCard(Cells.CellHost host)
     {
         var cellCenter = host.TranslatePoint(new Point(host.ActualWidth / 2, _m.Ring / 2), _canvas);
@@ -348,32 +348,25 @@ public sealed class PillWindow : Window
         var pillLeft = Canvas.GetLeft(_shape);
         var pillTop = Canvas.GetTop(_shape);
         double x, y;
-        Geometry tail;
         switch (Pill.Edge)
         {
             case "right":
-                x = pillLeft - _m.CardGap - _m.Tail + 4 - w;   // la queue chevauche la carte de 4 px pour ne laisser aucun jour
+                x = pillLeft - _m.CardGap - w;
                 y = Math.Clamp(cellCenter.Y - h / 2, 0, Math.Max(0, Height - h));
-                tail = Geometry.Parse(string.Create(CultureInfo.InvariantCulture, $"M{x + w - 4},{cellCenter.Y - 18} L{pillLeft - _m.CardGap},{cellCenter.Y} L{x + w - 4},{cellCenter.Y + 18} Z"));
                 break;
             case "left":
-                x = pillLeft + _m.Width + _m.CardGap + _m.Tail - 4;
+                x = pillLeft + _m.Width + _m.CardGap;
                 y = Math.Clamp(cellCenter.Y - h / 2, 0, Math.Max(0, Height - h));
-                tail = Geometry.Parse(string.Create(CultureInfo.InvariantCulture, $"M{x + 4},{cellCenter.Y - 18} L{pillLeft + _m.Width + _m.CardGap},{cellCenter.Y} L{x + 4},{cellCenter.Y + 18} Z"));
                 break;
             case "top":
-                y = pillTop + _m.Width + _m.CardGap + _m.Tail - 4;
+                y = pillTop + _m.Width + _m.CardGap;
                 x = Math.Clamp(cellCenter.X - w / 2, 0, Math.Max(0, Width - w));
-                tail = Geometry.Parse(string.Create(CultureInfo.InvariantCulture, $"M{cellCenter.X - 18},{y + 4} L{cellCenter.X},{pillTop + _m.Width + _m.CardGap} L{cellCenter.X + 18},{y + 4} Z"));
                 break;
             default:
-                y = pillTop - _m.CardGap - _m.Tail + 4 - h;
+                y = pillTop - _m.CardGap - h;
                 x = Math.Clamp(cellCenter.X - w / 2, 0, Math.Max(0, Width - w));
-                tail = Geometry.Parse(string.Create(CultureInfo.InvariantCulture, $"M{cellCenter.X - 18},{y + h - 4} L{cellCenter.X},{pillTop - _m.CardGap} L{cellCenter.X + 18},{y + h - 4} Z"));
                 break;
         }
         Canvas.SetLeft(_card, x); Canvas.SetTop(_card, y);
-        _card.Tail.Data = tail;
-        Canvas.SetLeft(_card.Tail, 0); Canvas.SetTop(_card.Tail, 0);
     }
 }

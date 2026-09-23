@@ -7,6 +7,8 @@
   cadence, actions, groupes), secrets chiffrés, démarrage automatique, thème. Chaque changement
   s'applique tout de suite ; `cells.json` n'a plus besoin d'être ouvert - il reste lisible et
   synchronisable, et un refus (valeur invalide) s'affiche en tête de l'éditeur sans rien perdre.
+- **La carte hover sans queue.** Le triangle qui pointait vers la cellule disparaît ; la carte se
+  pose à 8 px de la pilule, centrée sur la cellule survolée.
 - **Source `media`.** Ce qui joue (Spotify, navigateur, VLC…), lecture/pause au clic, précédent /
   suivant dans la carte ; grisée quand rien ne joue.
 - **Groupe « Système » par défaut.** CPU, mémoire, disque, réseau, batterie dans une seule cellule :

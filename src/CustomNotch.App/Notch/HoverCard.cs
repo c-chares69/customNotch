@@ -30,14 +30,11 @@ public sealed class HoverCard : Border
         MinWidth = 160;
         Visibility = Visibility.Collapsed;
         Child = new ScrollViewer { Content = _stack, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, MaxHeight = 400 };
-        Tail = new Path { Fill = Background, Visibility = Visibility.Collapsed };
         MouseEnter += (_, _) => CancelHide();
         MouseLeave += (_, _) => HideLater();
         _hide.Tick += (_, _) => { _hide.Stop(); Hide(); };
     }
 
-    /// <summary>La queue vers la cellule : un triangle 32 × 36, posé par la fenêtre à côté de la carte.</summary>
-    public Path Tail { get; }
     public string? CellId => _cellId;
     public bool IsOpen => Visibility == Visibility.Visible;
 
@@ -74,7 +71,6 @@ public sealed class HoverCard : Border
         }
         if (model.Note is not null) _stack.Children.Add(Text(model.Note, 12, FontWeights.Normal, Color.FromRgb(0xc8, 0xc8, 0xc8), new Thickness(0, 8, 0, 0), wrap: true));
         Visibility = Visibility.Visible;
-        Tail.Visibility = Visibility.Visible;
     }
 
     private static TextBlock Text(string text, double size, FontWeight weight, Color color, Thickness margin, bool wrap = false)
@@ -109,6 +105,5 @@ public sealed class HoverCard : Border
     {
         _cellId = null;
         Visibility = Visibility.Collapsed;
-        Tail.Visibility = Visibility.Collapsed;
     }
 }

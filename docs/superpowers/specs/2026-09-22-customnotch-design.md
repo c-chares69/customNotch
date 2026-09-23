@@ -184,7 +184,7 @@ la cadence. À l'inactivité (`IdleWatcher`, > 5 min), les cadences < 30 s passe
   gauche/droite, horizontale en haut/bas). `scale` par pilule.
 - **Cellule** : anneau 44 px, piste `#303030`, trait ~5 px, glyph 26 px au centre (`Geometry` — glyphes codenotch convertis
   + `Glyphs.cs`), texte 15 px semi-gras dessous (`%`, valeur+unité, ou rien). Pression : scale .93, 300 ms.
-- **Carte hover** : fond `#0a0a0a`, rayon 16 px, padding 16 px, largeur max 246 px, queue de 32×36 px vers la cellule,
+- **Carte hover** : fond `#0a0a0a`, rayon 16 px, padding 16 px, largeur max 246 px, sans queue vers la cellule (retirée en 0.2.0),
   dessinée **dans la même fenêtre** (pas de z-order). Contenu : en-tête (glyph + label), lignes de Detail (label / hint à droite,
   barre 4 px, valeur), boutons d'action, notice stale. Ouverture au survol après 150 ms, fermeture 250 ms après la sortie ;
   reste ouverte tant que le pointeur est dans la carte.
