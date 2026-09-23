@@ -17,7 +17,7 @@ public sealed class CpuSource : SourceBase
     private readonly object _lock = new();
 
     public override string Type => "system.cpu";
-    public override SourceSchema Schema => new(Type, "Processeur", Array.Empty<SchemaField>(), "cpu");
+    public override SourceSchema Schema => new(Type, "Processeur", Array.Empty<SchemaField>(), "cpu", "Occupation du processeur");
     public override TimeSpan DefaultRefresh => TimeSpan.FromSeconds(2);
 
     public override Task<Reading> ReadAsync(CellContext ctx, CancellationToken ct)

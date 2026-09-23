@@ -1,5 +1,6 @@
 using CustomNotch.Core.Config;
 using CustomNotch.Core.Model;
+using CustomNotch.Core.Sources;
 
 namespace CustomNotch.App;
 
@@ -17,4 +18,5 @@ public interface IPillHost
     void RequestRefresh(string cellId);
     void HidePill(string pillId);
     void ShowSettings();
+    SourceSchema? Schema(string sourceType);
 }

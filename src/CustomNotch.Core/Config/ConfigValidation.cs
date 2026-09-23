@@ -1,3 +1,7 @@
+using System.Globalization;
+using System.Text.Json.Nodes;
+using CustomNotch.Core.Sources;
+
 namespace CustomNotch.Core.Config;
 
 /// <summary>Une configuration fausse est refusée en bloc, avec le chemin du champ : jamais appliquée à moitié.</summary>
@@ -39,6 +43,54 @@ public static class ConfigValidation
         }
         DetectCycles(file, errors);
         return errors;
+    }
+
+    /// <summary>Avec les schémas : en plus des types de source, les params de chaque cellule sont vérifiés champ par champ
+    /// (requis, nombre, booléen, URL absolue, choix). Un placeholder non résolu vaut chaîne vide : un champ requis vide
+    /// est signalé comme tel — c'est aussi le symptôme d'un secret manquant.</summary>
+    public static List<string> Validate(CellsFile file, IReadOnlyDictionary<string, SourceSchema> schemas)
+    {
+        var errors = Validate(file, schemas.Keys.ToHashSet());
+        for (var i = 0; i < file.Pills.Count; i++)
+            for (var j = 0; j < file.Pills[i].Cells.Count; j++)
+            {
+                var cell = file.Pills[i].Cells[j];
+                if (cell.IsGroup || !schemas.TryGetValue(cell.Source, out var schema)) continue;
+                ValidateParams(cell, $"pills[{i}].cells[{j}].params", schema, errors);
+            }
+        return errors;
+    }
+
+    private static void ValidateParams(CellConfig cell, string at, SourceSchema schema, List<string> errors)
+    {
+        foreach (var field in schema.Fields)
+        {
+            var node = cell.Params?[field.Name];
+            var text = node switch { JsonValue v when v.TryGetValue<string>(out var s) => s, JsonValue v => v.ToJsonString(), _ => null };
+            if (node is null || text is { Length: 0 })
+            {
+                if (field.Required) errors.Add($"{at}.{field.Name} : requis (vide, placeholder ou secret manquant)");
+                continue;
+            }
+            switch (field.Type)
+            {
+                case "number":
+                    if (!(node is JsonValue nv && nv.TryGetValue<double>(out _)) && !double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+                        errors.Add($"{at}.{field.Name} « {text} » : nombre attendu");
+                    break;
+                case "bool":
+                    if (!(node is JsonValue bv && bv.TryGetValue<bool>(out _))) errors.Add($"{at}.{field.Name} « {text} » : true ou false attendu");
+                    break;
+                case "url":
+                    if (!Uri.TryCreate(text, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
+                        errors.Add($"{at}.{field.Name} « {text} » : URL http(s) absolue attendue");
+                    break;
+                case "choice":
+                    if (field.Choices is { Count: > 0 } && !field.Choices.Contains(text!))
+                        errors.Add($"{at}.{field.Name} « {text} » : attendu {string.Join(", ", field.Choices)}");
+                    break;
+            }
+        }
     }
 
     /// <summary>Un groupe qui se contient (directement ou via d'autres groupes) ferait boucler tout code qui

@@ -17,7 +17,7 @@ public sealed class NetworkSource : SourceBase
     private readonly object _lock = new();
 
     public override string Type => "system.network";
-    public override SourceSchema Schema => new(Type, "Réseau", new[] { new SchemaField("iface", "string", "Interface", Help: "Vide = toutes") }, "network");
+    public override SourceSchema Schema => new(Type, "Réseau", new[] { new SchemaField("iface", "string", "Interface", Help: "Vide = toutes") }, "network", "Débit réseau, avec historique");
     public override TimeSpan DefaultRefresh => TimeSpan.FromSeconds(2);
 
     public override Task<Reading> ReadAsync(CellContext ctx, CancellationToken ct)

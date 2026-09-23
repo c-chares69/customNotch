@@ -6,7 +6,7 @@ namespace CustomNotch.Core.Sources.System;
 public sealed class BatterySource : SourceBase
 {
     public override string Type => "system.battery";
-    public override SourceSchema Schema => new(Type, "Batterie", Array.Empty<SchemaField>(), "battery");
+    public override SourceSchema Schema => new(Type, "Batterie", Array.Empty<SchemaField>(), "battery", "Charge et alimentation");
     public override TimeSpan DefaultRefresh => TimeSpan.FromSeconds(30);
 
     public override Task<Reading> ReadAsync(CellContext ctx, CancellationToken ct)

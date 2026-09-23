@@ -16,7 +16,7 @@ public sealed class ShellSource : SourceBase
         new("max", "number", "Maximum"),
         new("unit", "string", "Unité"),
         new("timeoutSeconds", "number", "Délai (s)", Default: "5"),
-    }, "terminal");
+    }, "terminal", "La sortie d'une commande, lue comme nombre, JSON ou texte");
     public override TimeSpan DefaultRefresh => TimeSpan.FromMinutes(1);
 
     public override async Task<Reading> ReadAsync(CellContext ctx, CancellationToken ct)

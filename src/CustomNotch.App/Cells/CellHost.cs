@@ -89,6 +89,7 @@ public sealed class CellHost : StackPanel
         }
         _face.Render(view, _m);
         _caption.Text = view.Caption ?? "";
+        _caption.FontSize = (view.Kind == CellKind.Status ? 11 : 15) * _m.Scale;
         _caption.Opacity = view.Stale ? 0.55 : 1;
         ToolTip = null;   // la carte hover remplace l'infobulle
     }

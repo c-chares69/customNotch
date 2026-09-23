@@ -13,14 +13,14 @@ public sealed class HttpSource : SourceBase
     public override string Type => "http";
     public override SourceSchema Schema => new(Type, "HTTP / JSON", new SchemaField[]
     {
-        new("url", "url", "URL", Required: true),
-        new("method", "choice", "Méthode", Default: "GET", Choices: new[] { "GET", "POST" }),
-        new("path", "string", "Chemin JSON de la valeur", Help: "data.count ou items[0].n"),
-        new("textPath", "string", "Chemin JSON du texte"),
-        new("max", "number", "Maximum", Help: "Présent = anneau en %"),
-        new("unit", "string", "Unité"),
-        new("body", "string", "Corps (POST)"),
-    }, "globe");
+        new("url", "url", "URL", Required: true, Group: "Requête"),
+        new("method", "choice", "Méthode", Default: "GET", Choices: new[] { "GET", "POST" }, Group: "Requête"),
+        new("path", "string", "Chemin JSON de la valeur", Help: "data.count ou items[0].n", Group: "Lecture"),
+        new("textPath", "string", "Chemin JSON du texte", Group: "Lecture"),
+        new("max", "number", "Maximum", Help: "Présent = anneau en %", Group: "Lecture"),
+        new("unit", "string", "Unité", Group: "Lecture"),
+        new("body", "string", "Corps (POST)", Group: "Requête"),
+    }, "globe", "Un chiffre ou un texte lu dans une réponse JSON");
     public override TimeSpan DefaultRefresh => TimeSpan.FromMinutes(1);
 
     public override async Task<Reading> ReadAsync(CellContext ctx, CancellationToken ct)

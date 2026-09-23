@@ -319,9 +319,9 @@ public sealed class PillWindow : Window
     {
         try
         {
-            var click = host.Cell.Actions?.Click;
-            if (click is not null) await _host.RunActionAsync(host.Cell.Id, click);
-            else if (host.Cell.Source == "launcher") await _host.InvokeSourceAsync(host.Cell.Id, "open");
+            var plan = Core.Model.CellClickResolver.Resolve(host.Cell, _host.Schema(host.Cell.Source));
+            if (plan.Config is not null) await _host.RunActionAsync(host.Cell.Id, plan.Config);
+            else if (plan.SourceAction is not null) await _host.InvokeSourceAsync(host.Cell.Id, plan.SourceAction);
             else OpenCard(host);
         }
         catch (Exception ex)

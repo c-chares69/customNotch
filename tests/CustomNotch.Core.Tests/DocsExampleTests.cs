@@ -23,7 +23,7 @@ public class DocsExampleTests
         var path = Path.Combine(RepoRoot(), "docs", "cells.example.json");
         var text = File.ReadAllText(path);
         var file = CellsJson.ToFile(CellsJson.Parse(text));
-        var knownSources = CoreSources.Build().Types;
+        var knownSources = CoreSources.Build().Schemas;
         var errors = ConfigValidation.Validate(file, knownSources);
         Assert.True(errors.Count == 0, string.Join(" ; ", errors));
         Assert.Equal(2, file.Pills.Count);

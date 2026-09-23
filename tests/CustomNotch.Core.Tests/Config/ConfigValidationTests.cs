@@ -1,10 +1,20 @@
 using CustomNotch.Core.Config;
+using CustomNotch.Core.Sources;
 using Xunit;
 namespace CustomNotch.Core.Tests.Config;
 
 public class ConfigValidationTests
 {
     private static readonly HashSet<string> Known = new() { "system.cpu", "launcher" };
+
+    private static readonly Dictionary<string, SourceSchema> Schemas = new()
+    {
+        ["http"] = new("http", "HTTP", new SchemaField[]
+        {
+            new("url", "url", "URL", Required: true), new("max", "number", "Max"), new("method", "choice", "Méthode", Choices: new[] { "GET", "POST" }), new("flag", "bool", "Drapeau"),
+        }),
+        ["launcher"] = new("launcher", "Lanceur", new[] { new SchemaField("open", "string", "Ouvrir", Required: true) }),
+    };
 
     private static CellsFile File(string json) => CellsJson.ToFile(CellsJson.Parse(json));
 
@@ -64,5 +74,30 @@ public class ConfigValidationTests
     {
         var ex = Assert.Throws<ConfigException>(() => File("{"));
         Assert.Contains("JSON", ex.Message);
+    }
+
+    [Fact]
+    public void Les_params_sont_verifies_d_apres_le_schema()
+    {
+        var f = File("""
+            {"pills":[{"id":"p","cells":[
+            {"id":"a","source":"http","params":{"url":"pas une url","max":"beaucoup","method":"PUT","flag":"oui"}},
+            {"id":"b","source":"launcher"},
+            {"id":"c","source":"http","params":{"url":"https://x","max":3,"method":"GET","flag":true}}]}]}
+            """);
+        var errors = ConfigValidation.Validate(f, Schemas);
+        Assert.Contains(errors, e => e.Contains("cells[0].params.url"));
+        Assert.Contains(errors, e => e.Contains("cells[0].params.max") && e.Contains("nombre"));
+        Assert.Contains(errors, e => e.Contains("cells[0].params.method") && e.Contains("GET, POST"));
+        Assert.Contains(errors, e => e.Contains("cells[0].params.flag"));
+        Assert.Contains(errors, e => e.Contains("cells[1].params.open") && e.Contains("requis"));
+        Assert.DoesNotContain(errors, e => e.Contains("cells[2]"));
+    }
+
+    [Fact]
+    public void Une_source_inconnue_reste_signalee_avec_les_schemas()
+    {
+        var f = File("""{"pills":[{"id":"p","cells":[{"id":"a","source":"nope"}]}]}""");
+        Assert.Contains(ConfigValidation.Validate(f, Schemas), e => e.Contains("source « nope » inconnue"));
     }
 }

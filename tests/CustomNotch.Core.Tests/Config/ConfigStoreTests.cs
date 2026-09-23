@@ -1,12 +1,13 @@
 using System.Text.Json.Nodes;
 using CustomNotch.Core;
 using CustomNotch.Core.Config;
+using CustomNotch.Core.Sources;
 using Xunit;
 namespace CustomNotch.Core.Tests.Config;
 
 public class ConfigStoreTests : IDisposable
 {
-    private static readonly HashSet<string> Known = new() { "system.cpu", "system.memory", "system.disk", "system.network", "launcher", "http" };
+    private static readonly IReadOnlyDictionary<string, SourceSchema> Known = CoreSources.Build().Schemas;
     private readonly string _home = Path.Combine(Path.GetTempPath(), "cn-" + Guid.NewGuid().ToString("N")[..8]);
 
     public ConfigStoreTests() => Directory.CreateDirectory(_home);

@@ -62,6 +62,15 @@ public class CellViewTests
     }
 
     [Fact]
+    public void Un_statut_avec_texte_a_une_legende_tronquee()
+    {
+        Assert.Equal("Bohemian R…", CellViews.Caption(CellKind.Status, new Reading(Text: "Bohemian Rhapsody")));
+        Assert.Equal("Court", CellViews.Caption(CellKind.Status, new Reading(Text: "Court")));
+        Assert.Null(CellViews.Caption(CellKind.Status, Reading.Empty));
+        Assert.Null(CellViews.Caption(CellKind.Status, new Reading(Value: 3, Text: "x")));
+    }
+
+    [Fact]
     public void Une_lecture_perimee_porte_son_age()
     {
         var view = CellViews.From(Cell(), new Reading(Value: 1, Max: 2).AsStale(1_000, "réseau"), nowMs: 1_000 + 5 * 60_000);

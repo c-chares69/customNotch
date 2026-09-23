@@ -14,10 +14,12 @@ public sealed record CellContext(string CellId, JsonObject Params, JsonObject? G
 }
 
 /// <summary>Un champ de paramètre : la fenêtre de réglages en fait un formulaire, la validation le vérifie.
-/// Type : string | number | bool | secret | path | url | choice.</summary>
-public sealed record SchemaField(string Name, string Type, string Label, bool Required = false, string? Help = null, string? Default = null, IReadOnlyList<string>? Choices = null);
+/// Type : string | number | bool | secret | path | url | choice. Group : la section du formulaire (null = par défaut).</summary>
+public sealed record SchemaField(string Name, string Type, string Label, bool Required = false, string? Help = null, string? Default = null, IReadOnlyList<string>? Choices = null, string? Group = null);
 
-public sealed record SourceSchema(string Type, string Title, IReadOnlyList<SchemaField> Fields, string? DefaultGlyph = null);
+/// <summary>Ce qu'une source dit d'elle-même : son catalogue (Title, Description), ses champs, son glyph par défaut, et
+/// l'action qu'un clic sur la cellule déclenche quand la config n'en fixe pas (« open », « toggle »… ; null = la carte).</summary>
+public sealed record SourceSchema(string Type, string Title, IReadOnlyList<SchemaField> Fields, string? DefaultGlyph = null, string? Description = null, string? DefaultAction = null);
 
 /// <summary>Le contrat de toute source : lire, agir, et pousser une mise à jour hors cadence.</summary>
 public interface ISource

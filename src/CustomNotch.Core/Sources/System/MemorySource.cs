@@ -6,7 +6,7 @@ namespace CustomNotch.Core.Sources.System;
 public sealed class MemorySource : SourceBase
 {
     public override string Type => "system.memory";
-    public override SourceSchema Schema => new(Type, "Mémoire", Array.Empty<SchemaField>(), "memory");
+    public override SourceSchema Schema => new(Type, "Mémoire", Array.Empty<SchemaField>(), "memory", "Mémoire utilisée sur le total");
     public override TimeSpan DefaultRefresh => TimeSpan.FromSeconds(5);
 
     public override Task<Reading> ReadAsync(CellContext ctx, CancellationToken ct)

@@ -27,7 +27,7 @@ public sealed class Controller : IPillHost
     public Controller(string home)
     {
         _home = home;
-        _config = new ConfigStore(home, _registry.Types);
+        _config = new ConfigStore(home, _registry.Schemas);
         _scheduler = new Scheduler(_registry, _readings, () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), Core.Platform.Idle.Ms);
     }
 
@@ -161,4 +161,5 @@ public sealed class Controller : IPillHost
 
     public void RequestRefresh(string cellId) => _scheduler.RefreshNow(cellId);
     public void HidePill(string pillId) => _config.SetPillLocal(pillId, p => p["visible"] = false);
+    public SourceSchema? Schema(string sourceType) => _registry.Get(sourceType)?.Schema;
 }

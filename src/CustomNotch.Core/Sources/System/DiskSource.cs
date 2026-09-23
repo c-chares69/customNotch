@@ -5,7 +5,7 @@ namespace CustomNotch.Core.Sources.System;
 public sealed class DiskSource : SourceBase
 {
     public override string Type => "system.disk";
-    public override SourceSchema Schema => new(Type, "Disque", new[] { new SchemaField("drive", "string", "Lecteur", Required: true, Help: "C:", Default: "C:") }, "disk");
+    public override SourceSchema Schema => new(Type, "Disque", new[] { new SchemaField("drive", "string", "Lecteur", Required: true, Help: "C:", Default: "C:") }, "disk", "Espace utilisé d'un lecteur");
     public override TimeSpan DefaultRefresh => TimeSpan.FromMinutes(1);
 
     public override Task<Reading> ReadAsync(CellContext ctx, CancellationToken ct)

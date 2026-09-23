@@ -79,7 +79,8 @@ public static class CellViews
                 number = number.Replace(' ', ' ').Replace(' ', ' ');
                 return string.IsNullOrEmpty(r.Unit) ? number : $"{number} {r.Unit}";
             default:
-                return null;
+                // Une lecture sans valeur mais avec un texte (média : le titre) : dix caractères sous la cellule.
+                return r.Value is null && r.Text is { Length: > 0 } t ? (t.Length <= 10 ? t : t[..10].TrimEnd() + "…") : null;
         }
     }
 

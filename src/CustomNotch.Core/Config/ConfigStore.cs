@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using CustomNotch.Core.Sources;
 
 namespace CustomNotch.Core.Config;
 
@@ -9,7 +10,7 @@ namespace CustomNotch.Core.Config;
 public sealed class ConfigStore : IDisposable
 {
     private readonly string _home;
-    private readonly IReadOnlySet<string> _knownSources;
+    private readonly IReadOnlyDictionary<string, SourceSchema> _schemas;
     private readonly List<FileSystemWatcher> _watchers = new();
     private readonly object _lock = new();
     private System.Threading.Timer? _debounce;
@@ -18,10 +19,10 @@ public sealed class ConfigStore : IDisposable
     public event Action<CellsFile>? Changed;
     public event Action<string>? Rejected;
 
-    public ConfigStore(string home, IReadOnlySet<string> knownSources)
+    public ConfigStore(string home, IReadOnlyDictionary<string, SourceSchema> schemas)
     {
         _home = home;
-        _knownSources = knownSources;
+        _schemas = schemas;
         Directory.CreateDirectory(home);
         App = new AppConfig(Paths.ConfigFile(home));
         Secrets = new SecretsFile(Paths.SecretsFile(home));
@@ -61,7 +62,7 @@ public sealed class ConfigStore : IDisposable
                 // seulement dans les formes que Log.Redact reconnaît déjà (Bearer, pk_, sk-, ya29).
                 Log.Mask(secretValues);
                 var file = CellsJson.ToFile(resolved!.AsObject());
-                var errors = ConfigValidation.Validate(file, _knownSources);
+                var errors = ConfigValidation.Validate(file, _schemas);
                 LastErrors = errors;
                 if (errors.Count > 0)
                 {
