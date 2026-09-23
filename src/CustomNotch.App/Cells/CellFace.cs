@@ -52,7 +52,7 @@ public abstract class CellFace : Grid
         var square = shape == "square";
         var r = m.Ring / 2 - 1.25;
         var side = m.Ring - 2.5;
-        var squareRadius = 12.0 / 44 * m.Ring;
+        var squareRadius = SquareArc.Radius(m.Ring);
         _activity.Data = square
             ? SquareArc.Geometry(status == Status.Busy ? 0.25 : 1, side, squareRadius)
             : RingArc.Geometry(status == Status.Busy ? 0.25 : 1, r);

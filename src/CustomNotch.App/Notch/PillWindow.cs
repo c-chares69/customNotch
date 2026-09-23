@@ -61,6 +61,11 @@ public sealed class PillWindow : Window
         {
             Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnDisplayChanged;
             Microsoft.Win32.SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
+            // Sans ça, le minuteur d'ouverture (150 ms) et ceux de la carte (position, fermeture différée)
+            // continuaient de tourner après la fermeture de la fenêtre qui les porte (pilule supprimée de la
+            // config), tant que le dispatcher garde une référence vive dessus.
+            _open.Stop();
+            _card.Hide();
         };
         _shape.MouseEnter += (_, _) => _grip.Fill = new SolidColorBrush(Color.FromArgb(120, 255, 255, 255));
         _shape.MouseLeave += (_, _) => { if (_dragFrom is null) _grip.Fill = new SolidColorBrush(Color.FromArgb(0, 255, 255, 255)); };
@@ -114,12 +119,13 @@ public sealed class PillWindow : Window
     {
         RebuildCells();
         var extent = _m.Extent(CellCount);
-        var reserve = _m.CardWidth + _m.CardGap;
         _shape.Data = PillShape.Build(_m, Pill.Edge, CellCount);
         if (Vertical)
         {
+            // Bords gauche/droit : la carte s'ouvre sur le côté, la réserve perpendiculaire suit donc sa largeur.
+            var reserve = _m.CardWidth + _m.CardGap;
             Width = _m.Width + reserve;
-            Height = Math.Max(extent, 480);
+            Height = Math.Max(extent, _m.WindowFloor);
             var top = (Height - extent) / 2;
             var left = Pill.Edge == "right" ? reserve : 0;
             Canvas.SetLeft(_shape, left); Canvas.SetTop(_shape, top);
@@ -134,7 +140,11 @@ public sealed class PillWindow : Window
         }
         else
         {
-            Width = Math.Max(extent, 480);
+            // Bords haut/bas : la carte s'ouvre au-dessus ou en dessous, la réserve perpendiculaire suit donc sa
+            // hauteur (la plus grande possible, CardHeightMax) et non sa largeur — sinon une carte plus haute que
+            // large débordait de la fenêtre et se faisait couper par ses bords.
+            var reserve = _m.CardHeightMax + _m.CardGap;
+            Width = Math.Max(extent, _m.WindowFloor);
             Height = _m.Width + reserve;
             var left = (Width - extent) / 2;
             var top = Pill.Edge == "bottom" ? reserve : 0;
@@ -162,7 +172,10 @@ public sealed class PillWindow : Window
 
     private void MoveTo(Rect pill)
     {
-        var reserve = _m.CardWidth + _m.CardGap;
+        // Même réserve perpendiculaire que Layout (largeur de carte sur les bords verticaux, hauteur maximale sur
+        // les bords horizontaux) : sinon la fenêtre se repositionnait avec un décalage qui ne correspondait plus à
+        // sa propre taille.
+        var reserve = Vertical ? _m.CardWidth + _m.CardGap : _m.CardHeightMax + _m.CardGap;
         var extent = _m.Extent(CellCount);
         (Left, Top) = Pill.Edge switch
         {

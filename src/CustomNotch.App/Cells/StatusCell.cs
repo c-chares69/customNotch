@@ -32,7 +32,7 @@ public sealed class StatusCell : CellFace
         _square.Visibility = square ? Visibility.Visible : Visibility.Collapsed;
         _disc.Width = _disc.Height = m.Ring;
         _square.Width = _square.Height = m.Ring;
-        _square.CornerRadius = new CornerRadius(12.0 / 44 * m.Ring);
+        _square.CornerRadius = new CornerRadius(SquareArc.Radius(m.Ring));
         _dot.Width = _dot.Height = 11 * m.Scale;
         _dot.Fill = StatusPalette.Brush(view.Status);
         _dot.Visibility = view.Status == Status.Off ? Visibility.Collapsed : Visibility.Visible;

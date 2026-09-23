@@ -290,7 +290,11 @@ public sealed class HoverCard : Border
     public void Hide()
     {
         _cellId = null;
+        // Les deux minuteurs de la carte : _tick (avance de la position affichée) et _hide (fermeture différée,
+        // au cas où Hide() serait appelé pendant qu'elle compte déjà) — sans les arrêter tous les deux, l'un
+        // continuait de tourner après la fermeture de la fenêtre qui la porte.
         _tick.Stop();
+        _hide.Stop();
         Visibility = Visibility.Collapsed;
     }
 }

@@ -29,7 +29,10 @@ public sealed class RingCell : CellFace
     {
         var square = view.Shape == "square";
         var stroke = 5 * m.Scale;
-        var brush = StatusPalette.Brush(view.Status is Status.Busy or Status.Attention ? Status.Ok : view.Status);
+        // En activité « ring », l'arc animé porte déjà Busy/Attention : l'anneau lui-même retombe sur Ok pour ne
+        // pas doubler l'information. En « dot » (par défaut), il n'y a pas d'arc : c'est la teinte de l'anneau qui
+        // doit porter Busy/Attention, sans quoi une lecture Busy avait l'air Ok.
+        var brush = StatusPalette.Brush(view.Activity == "ring" && view.Status is Status.Busy or Status.Attention ? Status.Ok : view.Status);
         var opacity = view.Stale ? 0.55 : 1;
 
         _track.Visibility = square ? Visibility.Collapsed : Visibility.Visible;
@@ -43,7 +46,7 @@ public sealed class RingCell : CellFace
             // symétriquement de la même quantité et que Path se centre pareil dans la cellule (Width = la portée
             // native de la géométrie, sans le débord du trait — comme _arc ci-dessous).
             var side = m.Ring - stroke;
-            var radius = 12.0 / 44 * m.Ring - stroke / 2;
+            var radius = SquareArc.Radius(m.Ring, stroke);
             _squareTrack.StrokeThickness = stroke;
             _squareTrack.Width = _squareTrack.Height = side;
             _squareTrack.Data = SquareArc.Geometry(1, side, radius);

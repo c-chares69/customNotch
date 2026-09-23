@@ -16,6 +16,13 @@ public static class SquareArc
 
     public static double Perimeter(double size, double radius) => 4 * (size - 2 * radius) + 2 * Math.PI * radius;
 
+    /// <summary>Le rayon des coins arrondis pour un anneau de côté <paramref name="ring"/> : 12/44 de la
+    /// maquette validée (le rapport rayon/côté du carré dessiné à l'origine), moins la moitié du trait
+    /// <paramref name="stroke"/> quand il y en a un — pour que le trait déborde symétriquement de la même
+    /// quantité que sur le cercle (r = Ring/2 − stroke/2) et que la figure se centre pareil dans la cellule
+    /// (0 pour un carré plein, sans trait à dessiner).</summary>
+    public static double Radius(double ring, double stroke = 0) => 12.0 / 44 * ring - stroke / 2;
+
     /// <summary>Le point atteint après avoir parcouru fraction × Perimeter le long du contour.</summary>
     public static Point PointAt(double fraction, double size, double radius)
     {
