@@ -292,8 +292,8 @@ c'est ce que `CellHost`/`CellFace` dessinent, et ce que
 
 ## 5. Sources
 
-Les neuf sources livrées avec ce plan (`CoreSources.Build`) ; `claude` et `clickup` restent des
-sous-projets du plan 3 (§10).
+Les neuf sources livrées avec ce plan (`CoreSources.Build`) ; `claude` (en cours, voir plus bas) et
+`clickup` restent des sous-projets du plan 0.3.0/0.4.0 (§10).
 
 | Source | Params | Cadence par défaut | Lecture | Actions |
 |---|---|---|---|---|
@@ -329,6 +329,23 @@ applications ne republient la timeline que toutes les quelques secondes (elle s'
 côté carte (`HoverCard`, §6) à partir de `PositionAtMs`, jamais ici. Sans session (ou avec une
 session sans lecture en cours), `MediaSource.InvokeAsync("toggle"|"open")` ouvre `fallbackOpen`
 (`ActionRunner.Open`, injectable pour les tests) au lieu de ne rien faire.
+
+`claude` (`Core/Sources/Claude/`, pas encore une `ISource` enregistrée — les sessions et la cellule
+`ClaudeSource` arrivent aux tâches suivantes) : `ClaudeCredentialsFile.Read(dir)` lit
+`.credentials.json` (`claudeAiOauth.{accessToken, expiresAt, subscriptionType, rateLimitTier}`), en
+lecture seule, et masque le jeton (`Log.Mask`) avant de le rendre — il n'atteint jamais le journal.
+`UsageClient.FetchAsync` appelle `GET …/oauth/usage` (`Authorization: Bearer`,
+`anthropic-beta: oauth-2025-04-20`, 15 s) et lève une `UsageException` typée (`RateLimited` avec
+`Retry-After`, `Unauthorized`, `NoLimits`, `Network`) plutôt que de rendre un chiffre incertain.
+`UsageParser.Parse` est pur : `limits[]` (repli `five_hour`/`seven_day`) devient des `LimitWindow`
+dédoublonnées (alias d'id `session`/`five_hour`, `weekly_all`/`seven_day`/`weekly`, puis même reset
+et même pourcentage, puis même libellé français), et `seven_day_breakdown.rows[]` devient la
+répartition par surface. `Backoff.NextMs` double l'attente après un 429 (`Retry-After` ou 60 s par
+défaut) et la plafonne à 1 h ; `Backoff.Save`/`Load` la persistent dans
+`claude-backoff.json`, pour survivre à un redémarrage. `TokenRenewal.ShouldRenew` (pur) décide d'un
+renouvellement (`claude -p`, marge 4 min avant expiration, un essai par jeton puis une attente
+doublée par échec, plafonnée à 1 h) ; `TryRenewAsync` relance le CLI (délégué injecté) et juge sur
+l'avancée de `expiresAt` après relecture.
 
 ---
 

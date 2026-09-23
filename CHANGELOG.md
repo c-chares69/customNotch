@@ -1,5 +1,12 @@
 # Journal des versions
 
+## 0.3.0 - 2026-09-23
+
+- **Le jeton et l'usage Claude Code, lus sans jamais rien inventer.** `~/.claude/.credentials.json`
+  donne le jeton (jamais journalisé) ; `GET …/oauth/usage` donne les fenêtres de limite (session,
+  semaine tous modèles, semaine par modèle) et la répartition hebdomadaire par surface, avec un
+  backoff persisté après un 429 et un renouvellement automatique (`claude -p`) avant expiration.
+
 ## 0.2.2 - 2026-09-23
 
 - **Cellules rondes ou carrées, au choix par pilule** (Réglages → pilule → Forme des cellules) : la jauge
