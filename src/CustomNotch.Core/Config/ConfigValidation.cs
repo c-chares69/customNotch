@@ -46,8 +46,9 @@ public static class ConfigValidation
     }
 
     /// <summary>Avec les schémas : en plus des types de source, les params de chaque cellule sont vérifiés champ par champ
-    /// (requis, nombre, booléen, URL absolue, choix). Un placeholder non résolu vaut chaîne vide : un champ requis vide
-    /// est signalé comme tel — c'est aussi le symptôme d'un secret manquant.</summary>
+    /// (requis, nombre, booléen, URL absolue, choix). Une clé absente n'est pas une erreur de configuration : la source
+    /// le dira elle-même à la lecture (cellule qui reste périmée) ; une clé présente mais vide — placeholder ou secret non
+    /// résolu — est en revanche refusée ici, sur un champ requis.</summary>
     public static List<string> Validate(CellsFile file, IReadOnlyDictionary<string, SourceSchema> schemas)
     {
         var errors = Validate(file, schemas.Keys.ToHashSet());
@@ -66,8 +67,9 @@ public static class ConfigValidation
         foreach (var field in schema.Fields)
         {
             var node = cell.Params?[field.Name];
+            if (node is null) continue;
             var text = node switch { JsonValue v when v.TryGetValue<string>(out var s) => s, JsonValue v => v.ToJsonString(), _ => null };
-            if (node is null || text is { Length: 0 })
+            if (text is { Length: 0 })
             {
                 if (field.Required) errors.Add($"{at}.{field.Name} : requis (vide, placeholder ou secret manquant)");
                 continue;

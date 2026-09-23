@@ -82,8 +82,9 @@ public class ConfigValidationTests
         var f = File("""
             {"pills":[{"id":"p","cells":[
             {"id":"a","source":"http","params":{"url":"pas une url","max":"beaucoup","method":"PUT","flag":"oui"}},
-            {"id":"b","source":"launcher"},
-            {"id":"c","source":"http","params":{"url":"https://x","max":3,"method":"GET","flag":true}}]}]}
+            {"id":"b","source":"launcher","params":{"open":""}},
+            {"id":"c","source":"http","params":{"url":"https://x","max":3,"method":"GET","flag":true}},
+            {"id":"d","source":"launcher"}]}]}
             """);
         var errors = ConfigValidation.Validate(f, Schemas);
         Assert.Contains(errors, e => e.Contains("cells[0].params.url"));
@@ -92,6 +93,7 @@ public class ConfigValidationTests
         Assert.Contains(errors, e => e.Contains("cells[0].params.flag"));
         Assert.Contains(errors, e => e.Contains("cells[1].params.open") && e.Contains("requis"));
         Assert.DoesNotContain(errors, e => e.Contains("cells[2]"));
+        Assert.DoesNotContain(errors, e => e.Contains("cells[3]"));
     }
 
     [Fact]
