@@ -162,4 +162,24 @@
             </Setter.Value>
         </Setter>
     </Style>
+    <!-- La galerie de glyphes de l'éditeur de cellule : un bouton-bascule carré par icône, le tracé rendu, le nom en
+         infobulle ; le choix courant ressort en bord et fond teintés d'accent. -->
+    <Style x:Key="GlyphButton" TargetType="ToggleButton">
+        <Setter Property="Background" Value="{DynamicResource Surface}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="8">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHover}" /></Trigger>
+                        <Trigger Property="IsChecked" Value="True"><Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Accent}" /><Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentSoft}" /></Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 </ResourceDictionary>

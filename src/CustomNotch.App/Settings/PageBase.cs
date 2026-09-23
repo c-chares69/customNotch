@@ -1,11 +1,11 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Threading;
 
 namespace CustomNotch.App.Settings;
 
-/// <summary>Une page : en-tête (titre, sous-titre) et corps vertical, dans un défilement. Les briques communes aux pages
-/// (section, carte, ligne de formulaire, combo, champ à anti-rebond) vivent ici pour que chaque page reste courte.</summary>
+/// <summary>Une page : en-tête (titre, sous-titre) et corps vertical, dans un défilement. Les briques communes
+/// (section, carte, ligne de formulaire, combo, champ à anti-rebond, bouton) sont dans Bricks, partagées avec les
+/// éditeurs ; ici, de simples forwarders pour que les pages existantes appellent Section(...) sans préfixe.</summary>
 public abstract class PageBase : UserControl
 {
     protected readonly StackPanel Body = new();
@@ -48,54 +48,18 @@ public abstract class PageBase : UserControl
         _detach.Clear();
     }
 
-    protected static TextBlock Section(string text)
-    {
-        var t = Ui.Text(text.ToUpperInvariant(), 11, FontWeights.SemiBold, "Muted");
-        t.Margin = new Thickness(0, 18, 0, 6);
-        return t;
-    }
+    /// <summary>Briques déléguées à Bricks (partagées avec les éditeurs, qui ne sont pas des pages) : mêmes
+    /// signatures et mêmes valeurs par défaut qu'avant l'extraction, pour que les pages existantes n'aient rien à
+    /// changer.</summary>
+    protected static TextBlock Section(string text) => Bricks.Section(text);
 
-    protected static Border Card(UIElement content)
-    {
-        var card = new Border { Child = content, CornerRadius = new CornerRadius(10), Padding = new Thickness(16, 10, 16, 10), BorderThickness = new Thickness(1) };
-        card.SetResourceReference(Border.BackgroundProperty, "Surface");
-        card.SetResourceReference(Border.BorderBrushProperty, "Border");
-        return card;
-    }
+    protected static Border Card(UIElement content) => Bricks.Card(content);
 
-    protected static Grid Row(string label, UIElement field, double labelWidth = 220) => Ui.FormRow(Ui.FormLabel(label), field, labelWidth);
+    protected static Grid Row(string label, UIElement field, double labelWidth = 220) => Bricks.Row(label, field, labelWidth);
 
-    /// <summary>Une liste déroulante valeur/libellé qui rappelle onChange avec la valeur choisie.</summary>
-    protected static ComboBox Combo(IReadOnlyList<(string Value, string Label)> items, string? current, Action<string> onChange)
-    {
-        var combo = new ComboBox { MinWidth = 220, HorizontalAlignment = HorizontalAlignment.Left };
-        foreach (var (value, label) in items) combo.Items.Add(new ComboBoxItem { Content = label, Tag = value });
-        combo.SelectedIndex = Math.Max(0, items.ToList().FindIndex(i => i.Value == current));
-        combo.SelectionChanged += (_, _) => { if (combo.SelectedItem is ComboBoxItem it && it.Tag is string v) onChange(v); };
-        return combo;
-    }
+    protected static ComboBox Combo(IReadOnlyList<(string Value, string Label)> items, string? current, Action<string> onChange) => Bricks.Combo(items, current, onChange);
 
-    /// <summary>Un champ texte qui rappelle onChange 300 ms après la dernière frappe (et à la perte du focus). Au
-    /// démontage, une valeur en attente est validée tout de suite plutôt que perdue ou écrite à l'aveugle après coup
-    /// sur un éditeur qui n'existe plus.</summary>
-    protected static TextBox Debounced(string initial, Action<string> onChange, double width = 360)
-    {
-        var box = new TextBox { Text = initial, Width = width, HorizontalAlignment = HorizontalAlignment.Left };
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
-        var last = initial;
-        void Flush() { timer.Stop(); if (box.Text != last) { last = box.Text; onChange(box.Text); } }
-        timer.Tick += (_, _) => Flush();
-        box.TextChanged += (_, _) => { timer.Stop(); timer.Start(); };
-        box.LostFocus += (_, _) => Flush();
-        box.Unloaded += (_, _) => { if (timer.IsEnabled) Flush(); };
-        return box;
-    }
+    protected static TextBox Debounced(string initial, Action<string> onChange, double width = 360) => Bricks.Debounced(initial, onChange, width);
 
-    protected static Button Btn(string text, Action click, string style = "Secondary")
-    {
-        var b = new Button { Content = text, Margin = new Thickness(0, 0, 8, 0) };
-        b.SetResourceReference(StyleProperty, style);
-        b.Click += (_, _) => click();
-        return b;
-    }
+    protected static Button Btn(string text, Action click, string style = "Secondary") => Bricks.Btn(text, click, style);
 }

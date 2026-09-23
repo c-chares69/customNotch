@@ -36,6 +36,9 @@ public static class GlyphLibrary
 
     private static readonly Dictionary<string, (Geometry, bool)> Cache = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Les noms de glyphes utilisables dans la galerie, hors « dot » (le point par défaut, pas un choix).</summary>
+    public static IEnumerable<string> Names => Named.Keys.Where(k => k != "dot").OrderBy(k => k);
+
     public static (Geometry Data, bool Filled) Get(string? name)
     {
         var key = string.IsNullOrWhiteSpace(name) ? "dot" : name.Trim();
