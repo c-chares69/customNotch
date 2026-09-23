@@ -16,6 +16,10 @@ public sealed class WindowsMediaSession : IMediaSession, IDisposable
     private MediaState? _state;
     private TypedEventHandler<GlobalSystemMediaTransportControlsSession, MediaPropertiesChangedEventArgs>? _onProps;
     private TypedEventHandler<GlobalSystemMediaTransportControlsSession, PlaybackInfoChangedEventArgs>? _onPlayback;
+    private TypedEventHandler<GlobalSystemMediaTransportControlsSessionManager, CurrentSessionChangedEventArgs>? _onSession;
+    /// <summary>Dispose() peut s'exécuter pendant que InitAsync() attend RequestAsync() : sans ce drapeau, la
+    /// continuation se rattache un gestionnaire et une session comme si de rien n'était, et l'objet se « redispose ».</summary>
+    private volatile bool _disposed;
 
     public event Action? Changed;
 
@@ -30,8 +34,11 @@ public sealed class WindowsMediaSession : IMediaSession, IDisposable
     {
         try
         {
-            _manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
-            _manager.CurrentSessionChanged += (m, _) => Attach(m.GetCurrentSession());
+            var manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
+            if (_disposed) return;
+            _manager = manager;
+            _onSession = (m, _) => Attach(m.GetCurrentSession());
+            _manager.CurrentSessionChanged += _onSession;
             Attach(_manager.GetCurrentSession());
         }
         catch (Exception ex)
@@ -42,6 +49,7 @@ public sealed class WindowsMediaSession : IMediaSession, IDisposable
 
     private void Attach(GlobalSystemMediaTransportControlsSession? session)
     {
+        if (_disposed) session = null;
         lock (_lock)
         {
             if (_session is not null)
@@ -80,13 +88,17 @@ public sealed class WindowsMediaSession : IMediaSession, IDisposable
         }
     }
 
-    /// <summary>« Spotify.exe » ou « SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify » → un nom court.</summary>
+    /// <summary>« Spotify.exe » ou « SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify » → un nom court. Un AUMID vide ou
+    /// réduit à des séparateurs ne doit pas faire échouer la lecture de la session : on rend « média » plutôt que de
+    /// lever une exception.</summary>
     private static string AppName(string aumid)
     {
         var s = aumid.Split('!')[0];
         s = s.Split('_')[0];
-        s = s.Split('.').Last(part => part.Length > 0);
-        return s.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? s[..^4] : s;
+        var parts = s.Split('.', StringSplitOptions.RemoveEmptyEntries);
+        s = parts.Length > 0 ? parts[^1] : s;
+        if (s.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) s = s[..^4];
+        return s.Length > 0 ? s : "média";
     }
 
     private void Set(MediaState? state)
@@ -116,6 +128,8 @@ public sealed class WindowsMediaSession : IMediaSession, IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
+        if (_manager is not null && _onSession is not null) _manager.CurrentSessionChanged -= _onSession;
         Attach(null);
         _manager = null;
     }
