@@ -9,7 +9,7 @@ public sealed record CardRow(string Label, string? Text, double? Fraction, strin
 /// codage « child:action » dans SourceAction, qui appliquait le découpage même quand « action » lui-même
 /// contenait un « : » (ex. une action nommée par une source).</summary>
 public sealed record CardAction(string Label, string? Icon, ActionConfig? Config, string? SourceAction, string? TargetCellId = null);
-public sealed record CardModel(string Title, string? Glyph, string? Subtitle, IReadOnlyList<CardRow> Rows, IReadOnlyList<CardAction> Actions, string? Note);
+public sealed record CardModel(string Title, string? Glyph, string? Subtitle, IReadOnlyList<CardRow> Rows, IReadOnlyList<CardAction> Actions, string? Note, byte[]? Image);
 
 /// <summary>Ce que la carte affiche, calculé sans WPF : les lignes de détail de la source (ou la valeur seule), les
 /// enfants pour un groupe, les boutons déclarés dans la config puis ceux de la source, et la note de péremption.</summary>
@@ -44,6 +44,6 @@ public static class CardContent
             foreach (var a in view.Reading.Actions ?? Array.Empty<ActionSpec>())
                 actions.Add(new CardAction(a.Label, a.Icon, null, a.Id));
         var note = view.Stale ? $"Lecture {view.StaleAge} · {view.Reading.Error ?? "source injoignable"}" : null;
-        return new CardModel(view.Label, view.Glyph, view.Reading.Text is { } t && view.Kind != CellKind.Value ? t : null, rows, actions, note);
+        return new CardModel(view.Label, view.Glyph, view.Reading.Text is { } t && view.Kind != CellKind.Value ? t : null, rows, actions, note, view.Image);
     }
 }

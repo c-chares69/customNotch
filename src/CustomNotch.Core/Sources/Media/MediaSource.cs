@@ -43,7 +43,8 @@ public sealed class MediaSource : SourceBase
             {
                 new ActionSpec("prev", "Précédent", "prev"), new ActionSpec("toggle", state.Playing ? "Pause" : "Lecture", state.Playing ? "pause" : "play"),
                 new ActionSpec("next", "Suivant", "next"),
-            }));
+            },
+            Image: state.Cover));
     }
 
     public override Task InvokeAsync(string action, CellContext ctx, CancellationToken ct)

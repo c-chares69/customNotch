@@ -1,5 +1,11 @@
 # Journal des versions
 
+## 0.2.1 - 2026-09-23
+
+- **La pochette du média.** La cellule `media` montre la pochette de ce qui joue - en disque dans la
+  pilule, à la place du glyph, et en grand dans l'en-tête de la carte. C'est l'image que l'application
+  donne à Windows (Spotify, navigateur, VLC…) ; sans image, le glyph reste.
+
 ## 0.2.0 - 2026-09-23
 
 - **Tout se règle dans la fenêtre Réglages.** Pilules (bord, écran, position, échelle), cellules

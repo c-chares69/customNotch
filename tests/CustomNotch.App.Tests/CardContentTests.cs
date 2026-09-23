@@ -12,7 +12,8 @@ public class CardContentTests
     [Fact]
     public void Une_cellule_simple_liste_ses_details_et_actions()
     {
-        var reading = new Reading(Value: 73, Max: 100, Detail: new[] { new DetailRow("Session", "73 %", 0.73, "reset dans 51 min") }, Actions: new[] { new ActionSpec("refresh", "Rafraîchir") });
+        var bytes = new byte[] { 1, 2, 3 };
+        var reading = new Reading(Value: 73, Max: 100, Detail: new[] { new DetailRow("Session", "73 %", 0.73, "reset dans 51 min") }, Actions: new[] { new ActionSpec("refresh", "Rafraîchir") }, Image: bytes);
         var cell = new CellConfig { Id = "c", Label = "Claude", Actions = new CellActions { Card = new() { new ActionConfig { Label = "Ouvrir", Open = "https://claude.ai" } } } };
         var model = CardContent.Build(View("c", reading, "Claude"), cell, Array.Empty<CellView>());
         Assert.Equal("Claude", model.Title);
@@ -23,6 +24,7 @@ public class CardContentTests
         Assert.Equal("Ouvrir", model.Actions[0].Label);
         Assert.Equal("refresh", model.Actions[1].SourceAction);
         Assert.Null(model.Note);
+        Assert.Same(bytes, model.Image);
     }
 
     [Fact]

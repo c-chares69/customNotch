@@ -223,7 +223,8 @@ Chaque source rend un `Reading` — la seule chose que l'interface connaît :
 sealed record Reading(
     double? Value, double? Max, string? Unit, string? Text, Status? Status,
     IReadOnlyList<DetailRow>? Detail, IReadOnlyList<ActionSpec>? Actions,
-    IReadOnlyList<(long Ms, double V)>? History, long? StaleSinceMs, string? Error);
+    IReadOnlyList<(long Ms, double V)>? History, long? StaleSinceMs, string? Error,
+    byte[]? Image);
 ```
 
 `CellViews.From(cell, reading, nowMs)` en déduit une `CellView` (genre, statut, légende,
@@ -257,6 +258,10 @@ fraction) sans aucune dépendance WPF — c'est ce que `CellHost`/`CellFace` des
   l'enfant `headline` s'il est déclaré, sinon le pire enfant s'il a une fraction, sinon le
   premier enfant qui en a une, sinon le pire tout court. Le groupe n'est **périmé que si tous
   ses enfants le sont** (l'âge affiché est alors celui du plus ancien).
+- **`Reading.Image` / `CellView.Image`** : une image (PNG/JPEG, ≤ 512 Ko) à montrer à la place du
+  glyph — la pochette de `media`, pour l'instant. `CellViews.From` la reprend telle quelle ;
+  `FromGroup` montre celle de l'enfant `headline`, comme sa légende. Décodée une seule fois côté
+  App, par `CoverImage` (§6).
 - **Sources par cellule** : une instance de source sert toutes ses cellules ; l'état propre à
   chacune (delta CPU, historique réseau, ids poussés par `media`…) est gardé dans un
   dictionnaire par `cellId`, jamais dans des champs d'instance partagés.
@@ -288,7 +293,7 @@ sous-projets du plan 3 (§10).
 | `system.disk` | `drive` (défaut « C: ») | 1 min | `Value`/`Max` en Go, `Detail` (utilisé/total, libre) | `open` : ouvre le lecteur dans l'explorateur |
 | `system.network` | `iface?` (vide = toutes les interfaces actives) | 2 s | `Value` = débit total (Ko/s sous 1 Mo/s, Mo/s au-dessus), `Unit`, `Detail` (↓ réception, ↑ émission), `History` | — |
 | `system.battery` | — | 30 s | `Value` %, `Max` 100 ; `Status.Off` sans batterie ; `Ok` sur secteur, sinon seuils 20 %/10 % inversés ; `Detail` (charge, secteur ou temps restant) | — |
-| `media` | — | 5 s (+ poussé au changement) | `Text` = « Titre — Artiste » ; `Status.Busy` en lecture, `Off` sans session ; `Detail` (titre, artiste, application source) | `prev`, `toggle` (lecture/pause), `next` |
+| `media` | — | 5 s (+ poussé au changement) | `Text` = « Titre — Artiste » ; `Status.Busy` en lecture, `Off` sans session ; `Detail` (titre, artiste, application source) ; `Image` = la pochette (PNG/JPEG, ≤ 512 Ko), si la session en donne une | `prev`, `toggle` (lecture/pause), `next` |
 | `http` | `url`\*, `method` (GET/POST), `path`, `textPath`, `max?`, `unit?`, `body?`, `headers{}` | 1 min | `Value`/`Text` extraits du JSON par `path`/`textPath` (`JsonPath` minimal : « data.items[0].n ») ; `Max`/`Unit` s'ils sont fournis ; `Detail` d'une ligne | — |
 | `shell` | `command`\*, `parse` (number / json / text), `path?` (si json), `max?`, `unit?`, `timeoutSeconds` (5) | 1 min | selon `parse` : un nombre (+ `Max`/`Unit`), un nœud JSON pointé, ou le texte de sortie (`Detail`) | — |
 | `launcher` | `open`\* | 24 h | `Status.Off`, `Text` = la cible | `open` : ouvre la cible (URL, chemin, application) |
@@ -303,7 +308,10 @@ cellule sans écrire de code. `headers` de `http` porte l'authentification via
 
 `media` (`IMediaSession`, §7) lit la session média **système** (`Windows.Media.Control`,
 WinRT) — Spotify, un onglet de navigateur, VLC… — celle que Windows choisit comme active ;
-sans implémentation (tests, un autre OS) la source rend simplement `Off`.
+sans implémentation (tests, un autre OS) la source rend simplement `Off`. `WindowsMediaSession`
+lit aussi sa vignette (`ReadThumbnailAsync`), plafonnée à **512 Ko** (une image plus grande est
+ignorée) ; l'égalité de `MediaState` compare la pochette **par contenu**, pas par référence — un
+tableau relu à chaque rafraîchissement ne doit pas déclencher `Changed` en boucle.
 
 ---
 
@@ -364,7 +372,11 @@ sans implémentation (tests, un autre OS) la source rend simplement `Off`.
   couleur de l'anneau par statut (`StatusPalette`) ; Busy dessine un arc fin qui tourne
   par-dessus (1,2 s/tour), Attention une pulsation ambre (opacité 1 → 0,25, 0,55 s,
   aller-retour) — communs aux quatre faces (`CellFace.Activity`). Pression au clic : échelle
-  93 %, ressort 300 ms (`BackEase`).
+  93 %, ressort 300 ms (`BackEase`). `StatusCell` remplit son disque de la pochette
+  (`CoverImage.Decode(view.Image)`, `ImageBrush` figée) à la place du glyph quand la lecture en
+  porte une ; `CoverImage` décode une fois (cache par référence du tableau, dernier décodé
+  seulement) et rend `null` sur une image illisible, auquel cas la cellule retombe sur son
+  glyph. `HoverCard` fait de même en grand (40×40, coins 8 px) dans l'en-tête de la carte.
 
 ---
 

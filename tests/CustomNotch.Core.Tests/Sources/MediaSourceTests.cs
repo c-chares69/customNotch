@@ -86,4 +86,27 @@ public class MediaSourceTests
         Assert.Equal("music", schema.DefaultGlyph);
         Assert.Contains("media", CoreSources.Build().Types);
     }
+
+    [Fact]
+    public async Task La_pochette_traverse_la_lecture()
+    {
+        var session = new FakeSession { State = new MediaState("t", "a", "app", true, new byte[] { 1, 2, 3 }) };
+        var r = await new MediaSource(session).ReadAsync(Ctx(), CancellationToken.None);
+        Assert.Equal(new byte[] { 1, 2, 3 }, r.Image);
+
+        var sansPochette = new FakeSession { State = new MediaState("t", "a", "app", true) };
+        var r2 = await new MediaSource(sansPochette).ReadAsync(Ctx(), CancellationToken.None);
+        Assert.Null(r2.Image);
+    }
+
+    [Fact]
+    public void Deux_etats_a_pochette_identique_sont_egaux()
+    {
+        var a = new MediaState("t", "a", "app", true, new byte[] { 1, 2, 3 });
+        var b = new MediaState("t", "a", "app", true, new byte[] { 1, 2, 3 });
+        Assert.Equal(a, b);
+
+        var c = new MediaState("t", "a", "app", true, new byte[] { 1, 2, 4 });
+        Assert.NotEqual(a, c);
+    }
 }

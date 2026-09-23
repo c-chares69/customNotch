@@ -15,7 +15,8 @@ public sealed record CellView(
     double? Fraction,
     bool Stale,
     string? StaleAge,
-    Reading Reading);
+    Reading Reading,
+    byte[]? Image);
 
 public static class CellViews
 {
@@ -27,7 +28,7 @@ public static class CellViews
         var status = DeriveStatus(cell, r);
         var stale = r.StaleSinceMs is not null;
         return new CellView(cell.Id, kind, status, cell.Label ?? cell.Id, cell.Glyph, Caption(kind, r), Fraction(r), stale,
-            stale ? Age(nowMs - r.StaleSinceMs!.Value) : null, r);
+            stale ? Age(nowMs - r.StaleSinceMs!.Value) : null, r, r.Image);
     }
 
     /// <summary>L'ordre de décision : les enfants font toujours un groupe (la carte hover liste ses enfants, même
@@ -96,14 +97,14 @@ public static class CellViews
     public static CellView FromGroup(CellConfig group, IReadOnlyList<CellView> children, long nowMs)
     {
         if (children.Count == 0)
-            return new CellView(group.Id, CellKind.Group, Status.Off, group.Label ?? group.Id, group.Glyph, null, null, false, null, Reading.Empty);
+            return new CellView(group.Id, CellKind.Group, Status.Off, group.Label ?? group.Id, group.Glyph, null, null, false, null, Reading.Empty, null);
         var worst = children.MinBy(c => Rank(c.Status))!;
         var headline = (group.Headline is { } h ? children.FirstOrDefault(c => c.Id == h) : null)
             ?? (worst.Fraction is not null ? worst : children.FirstOrDefault(c => c.Fraction is not null) ?? worst);
         var stale = children.All(c => c.Stale);
         var oldest = stale ? children.Min(c => c.Reading.StaleSinceMs ?? nowMs) : (long?)null;
         return new CellView(group.Id, CellKind.Group, worst.Status, group.Label ?? group.Id, group.Glyph, headline.Caption, headline.Fraction, stale,
-            stale ? Age(nowMs - oldest!.Value) : null, headline.Reading);
+            stale ? Age(nowMs - oldest!.Value) : null, headline.Reading, headline.Image);
     }
 
     public static string Age(long ms)

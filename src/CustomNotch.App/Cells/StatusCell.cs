@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Shapes;
 using CustomNotch.App.Notch;
 using CustomNotch.Core.Model;
@@ -27,8 +28,21 @@ public sealed class StatusCell : CellFace
         _dot.Fill = StatusPalette.Brush(view.Status);
         _dot.Visibility = view.Status == Status.Off ? Visibility.Collapsed : Visibility.Visible;
         if (_glyph is not null) Children.Remove(_glyph);
-        _glyph = Glyph(view.Glyph, m, view.Stale || view.Status == Status.Off);
-        Children.Add(_glyph);
+        var image = CoverImage.Decode(view.Image);
+        if (image is not null)
+        {
+            var brush = new ImageBrush(image) { Stretch = Stretch.UniformToFill };
+            brush.Freeze();
+            _disc.Fill = brush;
+            _glyph = null;
+        }
+        else
+        {
+            _disc.Fill = StatusPalette.Frozen(StatusPalette.Track);
+            _glyph = Glyph(view.Glyph, m, view.Stale || view.Status == Status.Off);
+            Children.Add(_glyph);
+        }
+        _disc.Opacity = image is not null && (view.Stale || view.Status == Status.Off) ? 0.55 : 1;
         Activity(view.Status, m);
     }
 }

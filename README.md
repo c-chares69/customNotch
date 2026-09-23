@@ -143,7 +143,7 @@ commentaire) : [docs/cells.example.json](docs/cells.example.json).
 | `system.disk` | `drive` (« C: ») | anneau, Go utilisés / total, action « ouvrir » |
 | `system.network` | `iface` (facultatif) | débit Ko/s ou Mo/s, historique |
 | `system.battery` | — | anneau %, secteur ou temps restant |
-| `media` | — | titre — artiste de ce qui joue, occupée en lecture, actions précédent / lecture-pause / suivant |
+| `media` | — | titre — artiste de ce qui joue, occupée en lecture, actions précédent / lecture-pause / suivant, avec la pochette |
 | `http` | `url`, `method`, `path`, `textPath`, `max`, `unit`, `headers`, `body` | valeur ou texte extrait d'une réponse JSON |
 | `shell` | `command`, `parse`, `path`, `max`, `unit`, `timeoutSeconds` | valeur, JSON pointé, ou texte de sortie d'une commande |
 | `launcher` | `open` | rien à lire : un glyph et une action « ouvrir » |

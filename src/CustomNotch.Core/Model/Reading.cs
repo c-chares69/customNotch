@@ -8,6 +8,8 @@ public sealed record ActionSpec(string Id, string Label, string? Icon = null);
 
 /// <summary>Ce qu'une source produit, et la seule chose que l'interface connaît. Tout est facultatif : une source
 /// dit ce qu'elle sait, et CellViews en déduit le rendu.</summary>
+/// <param name="Image">Une image (PNG/JPEG tel que la source l'a reçue) à montrer à la place du glyph : pochette
+/// d'un média, avatar… Petite (≤ 512 Ko) : elle traverse chaque lecture.</param>
 public sealed record Reading(
     double? Value = null,
     double? Max = null,
@@ -18,7 +20,8 @@ public sealed record Reading(
     IReadOnlyList<ActionSpec>? Actions = null,
     IReadOnlyList<(long Ms, double V)>? History = null,
     long? StaleSinceMs = null,
-    string? Error = null)
+    string? Error = null,
+    byte[]? Image = null)
 {
     public static readonly Reading Empty = new();
 

@@ -79,12 +79,37 @@ public sealed class WindowsMediaSession : IMediaSession, IDisposable
             var props = await session.TryGetMediaPropertiesAsync();
             var playing = session.GetPlaybackInfo()?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
             var title = props?.Title ?? "";
-            Set(title.Length == 0 ? null : new MediaState(title, props?.Artist ?? "", AppName(session.SourceAppUserModelId), playing));
+            var cover = await ReadThumbnailAsync(props?.Thumbnail);
+            Set(title.Length == 0 ? null : new MediaState(title, props?.Artist ?? "", AppName(session.SourceAppUserModelId), playing, cover));
         }
         catch (Exception ex)
         {
             Log.Warning("media", $"Lecture de la session média : {ex.Message}");
             Set(null);
+        }
+    }
+
+    /// <summary>La vignette (pochette) de la session, telle quelle : les applications donnent du PNG ou du JPEG de
+    /// quelques dizaines de Ko. Plafonnée à 512 Ko (une image plus grande est ignorée plutôt que copiée à chaque
+    /// lecture) ; toute erreur rend null — la pochette est un agrément, jamais une raison de perdre le titre.</summary>
+    private static async Task<byte[]?> ReadThumbnailAsync(Windows.Storage.Streams.IRandomAccessStreamReference? thumbnail)
+    {
+        if (thumbnail is null) return null;
+        try
+        {
+            using var stream = await thumbnail.OpenReadAsync().AsTask();
+            if (stream.Size == 0 || stream.Size > 512 * 1024) return null;
+            using var reader = new Windows.Storage.Streams.DataReader(stream.GetInputStreamAt(0));
+            var size = (uint)stream.Size;
+            await reader.LoadAsync(size).AsTask();
+            var bytes = new byte[size];
+            reader.ReadBytes(bytes);
+            return bytes;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning("media", $"Vignette : {ex.Message}");
+            return null;
         }
     }
 

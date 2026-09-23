@@ -44,8 +44,18 @@ public sealed class HoverCard : Border
         CancelHide();
         _stack.Children.Clear();
         var head = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
-        var (glyph, filled) = GlyphLibrary.Get(model.Glyph);
-        head.Children.Add(filled ? Glyphs.Fill(glyph, 16, StatusPalette.Frozen(StatusPalette.Ink)) : Glyphs.Stroke(glyph, 16, StatusPalette.Frozen(StatusPalette.Ink), 1.6));
+        var image = CoverImage.Decode(model.Image);
+        if (image is not null)
+        {
+            var brush = new ImageBrush(image) { Stretch = Stretch.UniformToFill };
+            brush.Freeze();
+            head.Children.Add(new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(8), Background = brush, VerticalAlignment = VerticalAlignment.Center });
+        }
+        else
+        {
+            var (glyph, filled) = GlyphLibrary.Get(model.Glyph);
+            head.Children.Add(filled ? Glyphs.Fill(glyph, 16, StatusPalette.Frozen(StatusPalette.Ink)) : Glyphs.Stroke(glyph, 16, StatusPalette.Frozen(StatusPalette.Ink), 1.6));
+        }
         head.Children.Add(Text(model.Title, 15, FontWeights.SemiBold, Colors.White, new Thickness(8, 0, 0, 0)));
         _stack.Children.Add(head);
         if (model.Subtitle is not null) _stack.Children.Add(Text(model.Subtitle, 11, FontWeights.Normal, StatusPalette.Dim, new Thickness(0, -6, 0, 10)));

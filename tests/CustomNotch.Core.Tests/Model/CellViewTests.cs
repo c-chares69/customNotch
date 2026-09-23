@@ -86,4 +86,12 @@ public class CellViewTests
         Assert.Equal("il y a 2 h", CellViews.Age(2 * 3_600_000));
         Assert.Equal("il y a 3 j", CellViews.Age(3 * 86_400_000L));
     }
+
+    [Fact]
+    public void L_image_de_la_lecture_arrive_dans_la_vue()
+    {
+        var bytes = new byte[] { 1, 2, 3 };
+        var view = CellViews.From(Cell(), new Reading(Text: "x", Image: bytes), 0);
+        Assert.Same(bytes, view.Image);
+    }
 }
