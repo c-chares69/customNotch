@@ -24,13 +24,24 @@ public partial class App : Application
         var home = Paths.Home();
         Directory.CreateDirectory(home);
         Log.Directory = Paths.LogDir(home);
-        _instance = new SingleInstance(home);
-        if (!_instance.Acquire())
+        // Lancée par la tâche de surveillance (--auto), une copie s'efface si l'utilisateur a quitté lui-même
+        // depuis le menu de l'icône (marqueur stopped_by_user) ou si l'application tourne déjà. Lancée à la
+        // main, une seconde copie réveille la première (ses réglages) et s'arrête.
+        var auto = e.Args.Contains("--auto");
+        if (auto && (SingleInstance.StoppedByUser(home) || SingleInstance.IsRunning(home)))
         {
-            SingleInstance.Ping(home, "show");
             Shutdown();
             return;
         }
+        _instance = new SingleInstance(home);
+        if (!_instance.Acquire())
+        {
+            if (!auto) SingleInstance.Ping(home, "show");
+            Shutdown();
+            return;
+        }
+        SingleInstance.ClearStoppedByUser(home);
+        Log.Info("app", $"Démarrage {Core.App.Version} (.NET {Environment.Version})");
         DispatcherUnhandledException += (_, ex) =>
         {
             Log.Error("app", $"Exception non gérée : {ex.Exception}");

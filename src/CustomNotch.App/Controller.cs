@@ -5,6 +5,7 @@ using CustomNotch.Core;
 using CustomNotch.Core.Actions;
 using CustomNotch.Core.Config;
 using CustomNotch.Core.Model;
+using CustomNotch.Core.Platform;
 using CustomNotch.Core.Sources;
 
 namespace CustomNotch.App;
@@ -129,6 +130,9 @@ public sealed class Controller : IPillHost
 
     public void Quit()
     {
+        // Le watchdog (tâche planifiée, --auto) relance l'application quand elle est tombée ; pas quand on l'a
+        // quittée soi-même. Le marqueur est levé au prochain lancement volontaire.
+        SingleInstance.MarkStoppedByUser(_home);
         Stop();
         Application.Current.Shutdown();
     }

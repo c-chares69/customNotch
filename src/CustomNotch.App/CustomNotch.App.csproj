@@ -10,6 +10,7 @@
     <!-- Requis par le générateur de LibraryImportAttribute (FullScreenDetector) : il émet du code non sécurisé. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\..\assets\customnotch.ico</ApplicationIcon>
     <SatelliteResourceLanguages>fr</SatelliteResourceLanguages>
     <Description>customNotch - strip de statut et de lancement</Description>
     <!-- WFO0003 : l'analyseur WinForms suppose une appli WinForms pure ; ici WinForms ne sert qu'à
