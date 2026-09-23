@@ -29,7 +29,7 @@ Il est produit par `scripts\package.ps1` avec [Inno Setup 6](https://jrsoftware.
   « Quitter » volontaire) ;
 - arrête l'application en cours avant de remplacer ses fichiers, la relance à la fin ;
 - silencieux avec `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART` : c'est ainsi que la mise à jour
-  automatique la lancera, une fois le lecteur de manifeste écrit (0.3.1).
+  automatique le lance depuis *Réglages → Général → Mises à jour* (voir plus bas).
 
 ```powershell
 winget install Microsoft.DotNet.SDK.10                          # une fois
@@ -79,17 +79,32 @@ Sans certificat, la publication réussit et le dit : « non signé ».
 ### Mises à jour
 
 Le manifeste `latest.json` (version, URL, empreinte SHA-256, notes) est produit par
-`scripts\package.ps1` et publié dès maintenant avec le setup et l'archive. La vérification
-*dans l'application* (*Réglages → Général → Mises à jour*), le téléchargement et
-l'installation silencieuse arrivent en 0.3.1 ; en attendant, une nouvelle version se pose à
-la main, depuis les releases GitHub.
+`scripts\package.ps1` et publié avec le setup et l'archive. *Réglages → Général → Mises à
+jour* : case *Vérifier automatiquement* (`updates.enabled`, activée par défaut, vérification
+90 s après le démarrage puis toutes les *N* heures, `updates.interval_hours`, 24 par défaut),
+adresse du manifeste (`updates.url` - vide, c'est déjà l'adresse par défaut ci-dessous),
+boutons **Vérifier maintenant**, **Installer** (téléchargement, empreinte SHA-256 vérifiée,
+puis le setup silencieux `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART` - il arrête l'application,
+la remplace, la relance) et **Ignorer cette version**. Une bulle du tray prévient quand une
+version plus récente est trouvée.
 
 Publier une version : `scripts\package.ps1` puis `scripts\release.ps1`, qui crée la release
 GitHub `v<version>` (notes tirées de `CHANGELOG.md`) et y joint le setup, le zip et
-`latest.json`, avec le jeton que Git détient déjà. Le manifeste, une fois publié, est à
-`https://github.com/c-chares69/customNotch/releases/latest/download/latest.json`
-(dépôt public requis pour la mise à jour automatique ; sinon `package.ps1 -BaseUrl <adresse>`
-et déposer les fichiers sur un serveur ou un partage).
+`latest.json`, avec le jeton que Git détient déjà. Le manifeste publié est à
+`https://github.com/c-chares69/customNotch/releases/latest/download/latest.json` - c'est
+l'adresse par défaut, déjà connue de l'application sans rien régler (dépôt public requis ;
+sinon `package.ps1 -BaseUrl <adresse>`, déposer les fichiers sur un serveur ou un partage, et
+renseigner cette adresse dans *Réglages → Général → Mises à jour*).
+
+### Diagnostic
+
+*Réglages → Général → Journal et diagnostic → Signaler un problème…* (ou
+`customNotch.exe --report`, en ligne de commande, avant même l'instance unique) dépose sur le
+Bureau `customNotch-diagnostic-<horodatage>.zip` : informations système, `logs\journal.log`
+et `logs\errors.log`, `config.json`, `cells.json`, `cells.<machine>.json`,
+`claude-backoff.json` s'ils existent, et la liste (noms, tailles) des fichiers du dossier de
+données - jamais `secrets.json`, jamais un jeton ni un token, à joindre telle quelle à une
+demande d'aide.
 
 En développement, `dotnet run --project src/CustomNotch.App` suffit.
 

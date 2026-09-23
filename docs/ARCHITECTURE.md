@@ -6,13 +6,16 @@ ce qui joue… — et dont le survol ouvre une carte de détail avec des actions
 la famille ClickUp-Extended / AutoSort, dont elle reprend le stack, les briques (`Theme`, `Ui`,
 `Glyphs`, `Json`, `Log`, `Secrets`) et le patron de livraison (Inno Setup, tâches planifiées,
 manifeste de mise à jour). Ce document décrit l'architecture livrée par les versions 0.1.0 à
-0.3.0 (le socle, la fenêtre Réglages, la source média, le groupe Système par défaut, la
-livraison, puis la source `claude` et sa page Réglages) ; le code du dépôt l'implémente. La
-conception détaillée et les décisions sont dans
+0.3.1 (le socle, la fenêtre Réglages, la source média, le groupe Système par défaut, la
+livraison, la source `claude` et sa page Réglages, puis les mises à jour dans l'application et
+le diagnostic `--report`) ; le code du dépôt l'implémente. La conception détaillée et les
+décisions sont dans
 `docs/superpowers/specs/2026-09-22-customnotch-design.md` (le socle),
-`docs/superpowers/specs/2026-09-23-customnotch-settings-media-design.md` (Réglages, média) et
+`docs/superpowers/specs/2026-09-23-customnotch-settings-media-design.md` (Réglages, média),
 `docs/superpowers/specs/2026-09-23-customnotch-claude-design.md` (0.3.0 : jeton, usage,
-sessions, page Claude).
+sessions, page Claude) et
+`docs/superpowers/plans/2026-09-23-customnotch-mises-a-jour.md` (0.3.1 : mises à jour,
+diagnostic).
 
 ---
 
@@ -41,10 +44,12 @@ customNotch/
 │   ├── CustomNotch.Core/              # le cœur : sans interface, sans dépendance Windows (sauf Platform/)
 │   │   ├── CustomNotch.Core.csproj    # cible net10.0 nu : doit rester portable, aucune dépendance Windows
 │   │   ├── App.cs                     # identité : nom, AppUserModelID, version (Directory.Build.props), variable de dossier de données
-│   │   ├── Paths.cs                   # dossier de données : CUSTOMNOTCH_HOME, mode portable, %APPDATA%, chemins des trois fichiers
+│   │   ├── Paths.cs                   # dossier de données : CUSTOMNOTCH_HOME, mode portable, %APPDATA%, chemins des trois fichiers, Bureau (--report)
 │   │   ├── Json.cs                    # mise en forme JSON commune, écriture atomique (tmp + remplacement, réessais)
 │   │   ├── Log.cs                     # journal.log + errors.log, caviardage des tokens (Bearer, pk_, sk-, ya29.)
 │   │   ├── Secrets.cs                 # chiffrement DPAPI (préfixe dpapi:), entropie liée à l'application
+│   │   ├── Updates.cs                 # latest.json (manifeste), téléchargement vérifié SHA-256, setup silencieux ; UpdateChecker (0.3.1)
+│   │   ├── Diagnostics.cs             # archive de diagnostic (--report) : journaux, configuration, informations système, jamais secrets.json (0.3.1)
 │   │   ├── Config/
 │   │   │   ├── AppConfig.cs           # config.json : état d'app (chemin de cells.json, thème, langue), clés à points
 │   │   │   ├── CellsFile.cs           # le modèle de configuration : PillConfig, CellConfig, ActionConfig, CellsFile
@@ -104,8 +109,8 @@ customNotch/
 │   ├── CustomNotch.App/               # l'application WPF (+ WinForms pour NotifyIcon/Screen seulement)
 │   │   ├── CustomNotch.App.csproj     # cible net10.0-windows10.0.19041.0, WPF + WinForms (NotifyIcon/Screen), AllowUnsafeBlocks (LibraryImport)
 │   │   ├── app.manifest               # DPI par moniteur
-│   │   ├── App.xaml / App.xaml.cs     # styles globaux, ligne de commande (--version, --home, --auto), instance unique, exception non gérée
-│   │   ├── Controller.cs              # assemblage et cycle de vie : config → ordonnanceur → pilules, tray, fenêtre Réglages, tic d'une seconde
+│   │   ├── App.xaml / App.xaml.cs     # styles globaux, ligne de commande (--version, --home, --auto, --startup, --report), instance unique, exception non gérée
+│   │   ├── Controller.cs              # assemblage et cycle de vie : config → ordonnanceur → pilules, tray, fenêtre Réglages, tic d'une seconde, UpdateChecker (mises à jour, 0.3.1)
 │   │   ├── IPillHost.cs               # ce qu'une PillWindow demande au contrôleur (vues, actions, position, schéma) — testable avec un hôte factice
 │   │   ├── TrayIcon.cs                # icône de la zone de notification (dessinée au lancement), menu (dont Réglages), bulle de notice
 │   │   ├── Styles.xaml                # styles WPF partagés (boutons de la carte…)
@@ -129,7 +134,7 @@ customNotch/
 │   │   │   └── StatusPalette.cs       # les couleurs fixes de la pilule : son identité, indépendante du thème
 │   │   ├── Settings/                  # la fenêtre Réglages (§7)
 │   │   │   ├── SettingsWindow.cs      # sidebar (Pilules & cellules, Sources, Général) + page, barre « Fermer », une seule instance
-│   │   │   ├── SettingsContext.cs     # ConfigStore, ConfigEditor et schémas partagés par les pages
+│   │   │   ├── SettingsContext.cs     # ConfigStore, ConfigEditor, schémas et UpdateChecker (Controller.Updates) partagés par les pages
 │   │   │   ├── PageBase.cs            # titre, sous-titre, rangées ; abonnement à ConfigStore.Changed, sélection préservée
 │   │   │   ├── PillsPage.cs           # arbre pilule → cellules, barre d'outils (+ pilule, + cellule, ↑ ↓, masquer, supprimer)
 │   │   │   ├── PillEditor.cs          # bord, écran, position le long du bord, échelle, visible
@@ -140,7 +145,7 @@ customNotch/
 │   │   │   ├── EditorBanner.cs        # bandeau rouge en tête de l'éditeur quand ConfigEditor refuse ; la valeur reste dans le champ
 │   │   │   ├── SourcesPage.cs         # réglages globaux par type de source (aucun dans cette version) et liste des secrets
 │   │   │   ├── ClaudePage.cs          # compte, jeton, dernière lecture, sessions ; boutons Se connecter / Relire maintenant
-│   │   │   ├── GeneralPage.cs         # emplacement de cells.json, démarrage automatique, thème, journal, lien vers le dépôt
+│   │   │   ├── GeneralPage.cs         # emplacement de cells.json, apparence, mises à jour, journal et diagnostic (--report), démarrage automatique, thème, lien vers le dépôt
 │   │   │   └── Bricks.cs              # briques de formulaire communes aux pages (Section, Card, Row, Combo, Btn…)
 │   │   ├── Platform/
 │   │   │   ├── WindowsMediaSession.cs # IMediaSession pour Windows : GlobalSystemMediaTransportControlsSessionManager (WinRT)
@@ -562,13 +567,30 @@ même fenêtre (`Controller.ShowSettings`).
   rafraîchit sur `ClaudeSource.StatusChanged` (marshalé sur le `Dispatcher`, désabonné à
   `Detach()` comme `OnStoreChanged`) — jamais un minuteur propre, jamais le jeton affiché.
 - **Page « Général »** : emplacement de `cells.json` (chemin, Parcourir…, Ouvrir le dossier,
-  « prise en compte au redémarrage »), une carte **Apparence** (nouvelle, avant **Poste**) —
+  « prise en compte au redémarrage »), une carte **Apparence** —
   **indicateur d'activité** (Combo « Pastille seule » / « Anneau animé », `Appearance.Activity`,
   partagé) et **échelle de la carte** (curseur 100 % à 150 % par pas de 5, `Appearance.CardScale`)
-  —, puis démarrage automatique (`Autostart`, case reflétant la clé Run — la tâche
-  planifiée de l'installateur, §8, fait le même effet sans cette case), thème système/clair/
-  sombre (`config.json → appearance.theme`, `Theme.Apply` immédiat), Ouvrir le journal, version,
-  lien vers le dépôt.
+  —, une carte **Mises à jour** (0.3.1, ci-dessous), une carte **Journal et diagnostic**
+  (0.3.1, ci-dessous), puis démarrage automatique (`Autostart`, case reflétant la clé Run — la
+  tâche planifiée de l'installateur, §8, fait le même effet sans cette case), thème système/
+  clair/sombre (`config.json → appearance.theme`, `Theme.Apply` immédiat), version, lien vers le
+  dépôt.
+- **Carte « Mises à jour »** (0.3.1) : case *Vérifier automatiquement* (`updates.enabled`,
+  vraie par défaut), champ *Adresse du manifeste* (`updates.url` — vide, l'adresse par défaut
+  s'affiche en gris en dessous, `Updates.DefaultManifestUrl` : le dépôt public GitHub, §8),
+  curseur *Toutes les … h* (`updates.interval_hours`, 1-720, 24 par défaut), boutons
+  **Vérifier maintenant** (`UpdateChecker.Check(manual: true)`), **Installer** (visible quand
+  `UpdateChecker.Latest` n'est pas nul — `Prepare(latest)`, téléchargement vérifié puis
+  décompression) et **Ignorer cette version** (`Skip`), ligne de statut alimentée par
+  `UpToDate`/`Available`/`Failed`/`Progress` (marshalés sur le `Dispatcher`, désabonnés dans
+  `Detach()` via `OnDetach`, comme `ClaudePage`). `Controller.Updates` (`UpdateChecker`,
+  construit avec `ConfigStore.App`) vérifie 90 s après le démarrage puis toutes les 30 min si
+  `Due()` (`updates.enabled` et la cadence, une adresse vide ne désactive rien) ; `Available`
+  ouvre une bulle du tray, `ReadyToInstall` appelle `Updates.LaunchInstaller(stage)` — le setup
+  (`/CLOSEAPPLICATIONS`) arrête l'application, la remplace, la relance.
+- **Carte « Journal et diagnostic »** (0.3.1) : Ouvrir le journal (inchangé), **Signaler un
+  problème…** — `Diagnostics.MakeReport()` sur un `Task.Run` (jamais sur le thread UI), puis un
+  texte « Rapport déposé sur le Bureau : … » ; voir « `--report` » ci-dessous et §8.
 - **Toute modification passe par `ConfigEditor`** (anti-rebond 300 ms sur les champs texte),
   qui route chaque champ vers le bon fichier : le partagé (`cells.json`, un choix de
   configuration), le local (`cells.<machine>.json` — visibilité d'une cellule, comme la
@@ -621,10 +643,28 @@ Même patron que ClickUp-Extended, adapté au nom de l'application (`scripts/`, 
   `latest.json`, avec le jeton que Git détient déjà (`GITHUB_TOKEN`/`GH_TOKEN`, sinon le
   gestionnaire d'identifiants). L'adresse du manifeste devient alors
   `https://github.com/c-chares69/customNotch/releases/latest/download/latest.json`.
-- **`latest.json` est produit et publié dès 0.2.0** ; ce qui manque encore, c'est le **lire** :
-  la vérification en tâche de fond et le bandeau de *Réglages → Général → Mises à jour* arrivent
-  en 0.3.1 (§10). En attendant, une nouvelle version se pose à la main (le setup, ou `Installer`
-  sur le manifeste publié).
+- **`latest.json` est produit et publié dès 0.2.0**, et lu depuis 0.3.1 : `Updates.cs`
+  (`Core/`, repris de ClickUp-Extended) parse le manifeste (`ParseManifest`, une URL relative
+  résolue contre celle du manifeste), télécharge et vérifie l'empreinte SHA-256 avant de rendre
+  le fichier (`DownloadAsync`), décompresse une archive zip (`Extract`, attend `install.ps1` et
+  `customNotch\customNotch.exe` — c'est la forme produite par `package.ps1` ci-dessus, protégé
+  du « zip slip ») et lance l'installateur silencieux détaché (`LaunchInstaller`,
+  `InstallerCommand` choisit le setup `/VERYSILENT …` ou `install.ps1 -Source …` selon ce qui a
+  été téléchargé). `UpdateChecker` (même fichier) orchestre ça hors du thread d'interface :
+  `Check`/`Prepare` partent sur `Task.Run`, `Busy` empêche un second départ pendant qu'un premier
+  tourne ; `updates.url` vide retombe sur `Updates.DefaultManifestUrl` (l'adresse ci-dessus)
+  plutôt que d'échouer. `Controller.Updates`, construit avec `ConfigStore.App`, est le seul
+  exemplaire ; *Réglages → Général → Mises à jour* (§7) le pilote.
+- **Diagnostic (`--report`)** : `Diagnostics.MakeReport()` (`Core/`, repris de
+  ClickUp-Extended) écrit `customNotch-diagnostic-<horodatage>.zip` sur le Bureau
+  (`Paths.DesktopDir()`) — informations système, `logs\journal.log*`/`errors.log*`,
+  `config.json`, `cells.json`, `cells.<machine>.json`, `claude-backoff.json` s'ils existent, et
+  `fichiers.txt` (noms et tailles des fichiers du dossier de données) — **jamais**
+  `secrets.json` : contrairement à ClickUp-Extended, `config.json` et `cells.json` ne portent
+  jamais de secret en clair (`${secret:…}` reste un placeholder), donc pas de caviardage à
+  faire. `App.xaml.cs --report` (ligne de commande, avant le verrou d'instance unique — une
+  copie déjà lancée ne doit pas bloquer un rapport) et *Réglages → Général → Journal et
+  diagnostic → Signaler un problème…* (§7) appellent la même fonction.
 - **Icône** : `assets/customnotch.ico` (dessinée par `make-icon.ps1`) — menu Démarrer, barre
   des tâches, notifications, propriétés du fichier.
 
@@ -653,16 +693,11 @@ Même patron que ClickUp-Extended, adapté au nom de l'application (`scripts/`, 
 
 ## 10. Ce qui vient ensuite
 
-Hors périmètre des versions livrées jusqu'ici (0.1.0 à 0.3.0), posé par les specs
+Hors périmètre des versions livrées jusqu'ici (0.1.0 à 0.3.1), posé par les specs
 (`docs/superpowers/specs/2026-09-22-customnotch-design.md` §6-§8, §12 ;
 `docs/superpowers/specs/2026-09-23-customnotch-settings-media-design.md` §7 ;
 `docs/superpowers/specs/2026-09-23-customnotch-claude-design.md` §4) :
 
-- **0.3.1 — Mises à jour dans l'application** : le lecteur de `latest.json` (produit et publié
-  depuis 0.2.0, §8) repris de ClickUp-Extended (`Updates.cs`), *Réglages → Général → Mises à
-  jour*, téléchargement vérifié (empreinte SHA-256 du manifeste) et installation silencieuse
-  (`/VERYSILENT /SUPPRESSMSGBOXES /NORESTART`, §8). **Diagnostic** (`--report`) : archive de
-  bureau (journaux, configuration sans secret, informations système), comme ClickUp-Extended.
 - **0.4.0 — Source ClickUp** : endpoint local exposé par ClickUp-Extended (son propre
   sous-projet) ; la cellule `launcher` déjà posée par défaut (`DefaultCells`) reste un simple
   lien tant qu'il ne répond pas.

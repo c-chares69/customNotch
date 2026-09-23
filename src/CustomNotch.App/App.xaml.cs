@@ -24,6 +24,15 @@ public partial class App : Application
         var home = Paths.Home();
         Directory.CreateDirectory(home);
         Log.Directory = Paths.LogDir(home);
+        // Diagnostic hors ligne, avant le verrou d'instance unique : une copie qui tourne déjà ne doit pas empêcher
+        // --report, et --report ne doit pas réveiller ni compter comme un lancement de l'application.
+        if (e.Args.Contains("--report"))
+        {
+            var report = Diagnostics.MakeReport();
+            MessageBox.Show($"Rapport de diagnostic déposé sur le Bureau :\n{Path.GetFileName(report)}\n\nIl ne contient ni token, ni secret, ni jeton.", Core.App.Name);
+            Shutdown(0);
+            return;
+        }
         // Lancée par la tâche de surveillance (--auto), une copie s'efface si l'utilisateur a quitté lui-même
         // depuis le menu de l'icône (marqueur stopped_by_user) ou si l'application tourne déjà. Lancée à la
         // main, une seconde copie réveille la première (ses réglages) et s'arrête.

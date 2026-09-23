@@ -1,5 +1,21 @@
 # Journal des versions
 
+## 0.3.1 - 2026-09-23
+
+- **Mises à jour depuis l'application.** *Réglages → Général → Mises à jour* : vérification
+  automatique (case, adresse du manifeste - vide = le dépôt public par défaut -, cadence en
+  heures), **Vérifier maintenant**, **Installer** (téléchargement vérifié par empreinte SHA-256
+  puis setup silencieux `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART`, comme l'installateur),
+  **Ignorer cette version** ; une bulle du tray prévient quand une version plus récente est
+  trouvée (vérification à 90 s après le démarrage, puis toutes les 30 min). Repris de
+  ClickUp-Extended (`Updates.cs`, `UpdateChecker`).
+- **Diagnostic `--report`.** *Réglages → Général → Journal et diagnostic → Signaler un
+  problème…* (ou `customNotch.exe --report`, avant même l'instance unique) dépose sur le Bureau
+  une archive `customNotch-diagnostic-<horodatage>.zip` : informations système, journaux,
+  `config.json`, `cells.json`, `cells.<machine>.json`, `claude-backoff.json`, et la liste
+  (noms, tailles) des fichiers du dossier de données - jamais `secrets.json`, jamais un jeton.
+  Repris de ClickUp-Extended (`Diagnostics.cs`).
+
 ## 0.3.0 - 2026-09-23
 
 - **Le jeton et l'usage Claude Code, lus sans jamais rien inventer.** `~/.claude/.credentials.json`

@@ -31,6 +31,14 @@ public sealed class Controller : IPillHost
     private Settings.SettingsWindow? _settings;
     private bool _allHidden;
     private bool _stopped;
+    /// <summary>Secondes écoulées depuis Start() : première vérification des mises à jour à 90 s, puis toutes les
+    /// 30 min (Updates.Due() tranche selon updates.interval_hours) - compté dans le même tic que le reste plutôt
+    /// que d'ajouter un minuteur de plus.</summary>
+    private int _secondsSinceStart;
+
+    /// <summary>Vérification, téléchargement et installation des mises à jour ; construit avec la même
+    /// configuration que le reste de l'app (updates.enabled/url/interval_hours dans config.json).</summary>
+    public UpdateChecker Updates { get; }
 
     public Controller(string home)
     {
@@ -42,6 +50,7 @@ public sealed class Controller : IPillHost
         _config = new ConfigStore(home, _registry.Schemas);
         _editor = new ConfigEditor(_config, _registry.Schemas);
         _scheduler = new Scheduler(_registry, _readings, Now, Core.Platform.Idle.Ms);
+        Updates = new UpdateChecker(_config.App);
     }
 
     /// <summary>La vraie ClaudeSource : jeton (~/.claude/.credentials.json), usage (HttpSource.Http), CLI trouvé
@@ -87,6 +96,8 @@ public sealed class Controller : IPillHost
         _tray.QuitRequested += Quit;
         _tray.ToggleAllRequested += ToggleAll;
         _tray.PillToggleRequested += TogglePill;
+        Updates.Available += r => Ui.BeginInvoke(() => OnUpdateAvailable(r));
+        Updates.ReadyToInstall += stage => Ui.BeginInvoke(() => Core.Updates.LaunchInstaller(stage));
         _tick.Tick += (_, _) =>
         {
             foreach (var p in _pills.Values)
@@ -94,6 +105,9 @@ public sealed class Controller : IPillHost
                 p.SetFullScreen(FullScreenDetector.IsFullScreenOn(p.CurrentScreen));
                 p.Tick();
             }
+            _secondsSinceStart++;
+            if (_secondsSinceStart == 90 || (_secondsSinceStart > 90 && (_secondsSinceStart - 90) % 1800 == 0))
+                if (Updates.Due()) Updates.Check(manual: false);
         };
         _tick.Start();
         if (!_config.Load()) _tray.Notify("Configuration refusée", string.Join(" ; ", _config.LastErrors));
@@ -157,13 +171,19 @@ public sealed class Controller : IPillHost
     {
         if (_settings is null)
         {
-            _settings = new Settings.SettingsWindow(new Settings.SettingsContext(_config, _editor, _registry));
+            _settings = new Settings.SettingsWindow(new Settings.SettingsContext(_config, _editor, _registry, Updates));
             _settings.Closed += (_, _) => _settings = null;
         }
         _settings.Show();
         if (_settings.WindowState == WindowState.Minimized) _settings.WindowState = WindowState.Normal;
         _settings.Activate();
     }
+
+    /// <summary>Une version plus récente vient d'être trouvée (vérification automatique ou manuelle) : la bulle
+    /// du tray renvoie vers la carte « Mises à jour », qui lit <see cref="Core.UpdateChecker.Latest"/> pour
+    /// proposer d'installer.</summary>
+    private void OnUpdateAvailable(Release release)
+        => _tray.Notify($"{Core.App.Name} {release.Version} disponible", "Réglages → Général → Mises à jour pour l'installer.");
 
     public void Quit()
     {

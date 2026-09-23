@@ -30,6 +30,9 @@ public static class Paths
     public static string SecretsFile(string? home = null) => Path.Combine(home ?? Home(), "secrets.json");
     public static string LogDir(string? home = null) => Path.Combine(home ?? Home(), "logs");
 
+    /// <summary>Où <c>--report</c> dépose son archive de diagnostic : le Bureau de l'utilisateur.</summary>
+    public static string DesktopDir() => Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+
     /// <summary>Le nom de machine, en minuscules et sans caractère interdit dans un nom de fichier.</summary>
     public static string MachineSlug(string? machine = null)
     {
