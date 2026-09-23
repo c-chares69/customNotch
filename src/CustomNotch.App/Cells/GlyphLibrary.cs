@@ -22,8 +22,10 @@ public static class GlyphLibrary
         ["open"] = ("M6.5,3 L3,3 L3,13 L13,13 L13,9.5 M9,3 L13,3 L13,7 M13,3 L7.5,8.5", false),
         ["play"] = ("M0,0 L10,5 L0,10 Z", true),
         ["pause"] = ("M0,0 L3,0 L3,10 L0,10 Z M6,0 L9,0 L9,10 L6,10 Z", true),
-        ["prev"] = ("M11,3 L5,8 L11,13 M4,3 L4,13", false),
-        ["next"] = ("M5,3 L11,8 L5,13 M12,3 L12,13", false),
+        // Précédent / suivant pleins, dans la même boîte 10×10 que play/pause : un triangle et une barre, comme les
+        // touches d'un lecteur — les chevrons filaires d'avant se lisaient mal à 16 px à côté des boutons pleins.
+        ["prev"] = ("M0,0 L2,0 L2,10 L0,10 Z M10,0 L3,5 L10,10 Z", true),
+        ["next"] = ("M8,0 L10,0 L10,10 L8,10 Z M0,0 L7,5 L0,10 Z", true),
         ["refresh"] = ("M13,8 A5,5 0 1 1 11.6,4.4 M11.8,2.2 L11.8,4.8 L9.2,4.8", false),
         ["gear"] = ("M8,5.6 A2.4,2.4 0 1 1 7.99,5.6 Z M8,1.5 L8,3.4 M8,12.6 L8,14.5 M1.5,8 L3.4,8 M12.6,8 L14.5,8 M3.4,3.4 L4.75,4.75 M11.25,11.25 L12.6,12.6 M3.4,12.6 L4.75,11.25 M11.25,4.75 L12.6,3.4", false),
         ["bell"] = ("M4,11.5 L12,11.5 L11,10 L11,7 A3,3 0 0 0 5,7 L5,10 Z M6.8,13.5 L9.2,13.5", false),
