@@ -12,11 +12,15 @@ Conception détaillée : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Versions 
 
 ## Installation
 
-En développement :
+Un exécutable unique, un raccourci dans le menu Démarrer, et le lancement à l'ouverture de session :
 
 ```powershell
-dotnet run --project src/CustomNotch.App
+powershell -ExecutionPolicy Bypass -File scripts\publish.ps1 -Shortcut -Autostart -Run
 ```
+
+Cela produit `dist\customNotch\customNotch.exe` (fichier unique, ~25 Mo ; le runtime .NET 10 Desktop reste
+partagé — s'il manque, `winget install Microsoft.DotNet.DesktopRuntime.10`). Sans les options, le script
+publie seulement. En développement, `dotnet run --project src/CustomNotch.App` suffit.
 
 L'installateur (Inno Setup, tâches planifiées, mises à jour) arrive avec le plan 2 ; en
 attendant, l'application se lance depuis les sources ou un `dotnet publish` fait à la main.

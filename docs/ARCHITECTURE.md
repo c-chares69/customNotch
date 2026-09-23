@@ -111,6 +111,7 @@ customNotch/
 │   │       ├── Native.cs              # GetWindowLong/SetWindowLong (WS_EX_NOACTIVATE | TOOLWINDOW)
 │   │       ├── Screens.cs             # écrans et conversions pixels physiques → unités WPF
 │   │       ├── Theme.cs               # palettes claire/sombre, accent système, chrome de fenêtre sombre
+│   │       ├── TrayMenuRenderer.cs    # le menu du tray (WinForms) peint avec la palette : le rendu Windows est toujours clair
 │   │       └── Ui.cs                  # les briques communes : pastille, bouton, ligne de formulaire (pour Settings, plan 2)
 │   └── CustomNotch.Hook/
 │       ├── CustomNotch.Hook.csproj    # console minimale, net10.0, InvariantGlobalization : doit démarrer en moins de 100 ms
@@ -118,6 +119,8 @@ customNotch/
 ├── tests/
 │   ├── CustomNotch.Core.Tests/        # xUnit : configuration, modèle, sources, chemins — tout sans écran
 │   └── CustomNotch.App.Tests/         # xUnit : les fonctions pures de rendu (forme, placement, glyphes, contenu de carte)
+├── scripts/
+│   └── publish.ps1                    # dotnet publish → dist\customNotch\customNotch.exe ; -Shortcut (menu Démarrer), -Autostart (clé Run), -Run
 ├── docs/
 │   ├── ARCHITECTURE.md, cells.example.json, apercu-pilule.png
 │   └── superpowers/{specs,plans}/     # la spec validée, le plan d'implémentation
@@ -259,7 +262,11 @@ cellule sans écrire de code. `headers` de `http` porte l'authentification via
   du corps moins un quart de cercle, comme le `::before` de codenotch), puis applique une
   `MatrixTransform` pour les trois autres bords (miroir à gauche, rotations à `top`/`bottom`).
   Liseré 1 px `#2e2e2e`, fond `#000` — la pilule reste toujours sombre, c'est son identité,
-  indépendante du thème de l'application.
+  indépendante du thème de l'application. Les **menus**, eux, suivent le thème de Windows :
+  le menu du tray est peint par `TrayMenuRenderer` avec `Theme.CurrentPalette` (le rendu WinForms
+  est toujours clair), le menu clic-droit de la pilule par les styles `ContextMenu`/`MenuItem`
+  de `Styles.xaml` liés aux pinceaux que `Theme.Apply` pose, et `Controller` repose ces pinceaux
+  sur `SystemEvents.UserPreferenceChanged` quand Windows bascule clair/sombre en cours de route.
 - **`EdgePlacement`** (fonctions pures, testées sans fenêtre) place le rectangle de la pilule
   contre le bord demandé, à `along` de la longueur disponible (`aire − extent`) ; `AlongFrom`
   fait le calcul inverse pendant un drag. `PillWindow.Reposition` résout l'écran nommé

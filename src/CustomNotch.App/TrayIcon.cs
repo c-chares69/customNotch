@@ -23,7 +23,15 @@ public sealed class TrayIcon : IDisposable
 
     public TrayIcon()
     {
-        _menu = new WinForms.ContextMenuStrip { Font = new System.Drawing.Font("Segoe UI", 10f) };
+        // Le rendu WinForms par défaut est toujours clair, quel que soit le thème de Windows : le menu est peint avec
+        // la palette de l'application (Theme.CurrentPalette, relue à chaque dessin — un changement de thème se voit
+        // à l'ouverture suivante). ToolStripManager : les sous-menus créés plus tard héritent du même rendu.
+        WinForms.ToolStripManager.Renderer = new TrayMenuRenderer();
+        _menu = new WinForms.ContextMenuStrip
+        {
+            Font = new System.Drawing.Font("Segoe UI", 10f), ShowImageMargin = false, ShowCheckMargin = true,
+            Padding = new WinForms.Padding(6, 8, 6, 8),
+        };
         _pills = new WinForms.ToolStripMenuItem("Pilules");
         _menu.Items.AddRange(new WinForms.ToolStripItem[]
         {

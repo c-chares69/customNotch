@@ -36,6 +36,9 @@ public sealed class Controller : IPillHost
     public void Start()
     {
         Theme.Apply(Application.Current, _config.App);
+        // Windows qui bascule clair/sombre pendant que l'app tourne : les pinceaux sont reposés, les menus suivent
+        // (la pilule, elle, reste noire : c'est son identité). L'événement arrive sur un thread système.
+        Microsoft.Win32.SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
         _config.Changed += file => Ui.BeginInvoke(() => ApplyConfig(file));
         _config.Rejected += message => Ui.BeginInvoke(() => _tray.Notify("Configuration refusée", message));
         _readings.Changed += id => Ui.BeginInvoke(() => OnReadingChanged(id));
@@ -116,10 +119,17 @@ public sealed class Controller : IPillHost
     }
 
     /// <summary>Idempotente : Quit() et App.OnExit l'appellent tous les deux, le second appel ne doit rien refaire.</summary>
+    private void OnUserPreferenceChanged(object? sender, Microsoft.Win32.UserPreferenceChangedEventArgs e)
+    {
+        if (e.Category != Microsoft.Win32.UserPreferenceCategory.General) return;
+        Ui.BeginInvoke(() => { if (!_stopped) Theme.Apply(Application.Current, _config.App); });
+    }
+
     public void Stop()
     {
         if (_stopped) return;
         _stopped = true;
+        Microsoft.Win32.SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
         _tick.Stop();
         _scheduler.Dispose();
         _config.Dispose();
