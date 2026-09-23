@@ -36,34 +36,40 @@ public abstract class CellFace : Grid
         return path;
     }
 
-    protected void Activity(Status status, PillMetrics m)
+    /// <summary>« dot » : Busy/Attention ne colorent que la pastille de la face (StatusCell) ou la teinte du statut
+    /// (RingCell) — pas d'arc, pas d'animation qui tourne. « ring » : l'arc animé d'aujourd'hui, en rond ou, en
+    /// forme carrée, le long du contour de SquareArc (qui tourne comme le rond : ça reste lisible autour du centre).</summary>
+    protected void Activity(Status status, PillMetrics m, string activity, string shape)
     {
         Width = m.Ring; Height = m.Ring;
-        if (status is Status.Busy or Status.Attention)
-        {
-            var r = m.Ring / 2 - 1.25;
-            _activity.Data = RingArc.Geometry(status == Status.Busy ? 0.25 : 1, r);
-            _activity.Width = 2 * r; _activity.Height = 2 * r;
-            _activity.Stroke = StatusPalette.Brush(status);
-            _activity.Visibility = Visibility.Visible;
-            if (status == Status.Busy && !_spinning)
-            {
-                _spinning = true;
-                _spin.BeginAnimation(RotateTransform.AngleProperty, new DoubleAnimation(0, 360, TimeSpan.FromSeconds(1.2)) { RepeatBehavior = RepeatBehavior.Forever });
-                _activity.BeginAnimation(OpacityProperty, null);
-                _activity.Opacity = 1;
-            }
-            else if (status == Status.Attention)
-            {
-                StopSpin();
-                _activity.BeginAnimation(OpacityProperty, new DoubleAnimation(1, 0.25, TimeSpan.FromSeconds(0.55)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever });
-            }
-        }
-        else
+        if (activity != "ring" || status is not (Status.Busy or Status.Attention))
         {
             StopSpin();
             _activity.BeginAnimation(OpacityProperty, null);
             _activity.Visibility = Visibility.Collapsed;
+            return;
+        }
+        var square = shape == "square";
+        var r = m.Ring / 2 - 1.25;
+        var side = m.Ring - 2.5;
+        var squareRadius = 12.0 / 44 * m.Ring;
+        _activity.Data = square
+            ? SquareArc.Geometry(status == Status.Busy ? 0.25 : 1, side, squareRadius)
+            : RingArc.Geometry(status == Status.Busy ? 0.25 : 1, r);
+        _activity.Width = square ? side : 2 * r; _activity.Height = square ? side : 2 * r;
+        _activity.Stroke = StatusPalette.Brush(status);
+        _activity.Visibility = Visibility.Visible;
+        if (status == Status.Busy && !_spinning)
+        {
+            _spinning = true;
+            _spin.BeginAnimation(RotateTransform.AngleProperty, new DoubleAnimation(0, 360, TimeSpan.FromSeconds(1.2)) { RepeatBehavior = RepeatBehavior.Forever });
+            _activity.BeginAnimation(OpacityProperty, null);
+            _activity.Opacity = 1;
+        }
+        else if (status == Status.Attention)
+        {
+            StopSpin();
+            _activity.BeginAnimation(OpacityProperty, new DoubleAnimation(1, 0.25, TimeSpan.FromSeconds(0.55)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever });
         }
     }
 

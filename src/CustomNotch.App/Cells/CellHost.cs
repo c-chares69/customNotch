@@ -91,6 +91,9 @@ public sealed class CellHost : StackPanel
         _caption.Text = view.Caption ?? "";
         _caption.FontSize = (view.Kind == CellKind.Status ? 11 : 15) * _m.Scale;
         _caption.Opacity = view.Stale ? 0.55 : 1;
+        // Hidden, pas Collapsed : la hauteur (m.Caption) reste réservée pour que le pas des cellules ne bouge pas
+        // selon que chacune montre sa légende ou non.
+        _caption.Visibility = view.ShowCaption ? Visibility.Visible : Visibility.Hidden;
         ToolTip = null;   // la carte hover remplace l'infobulle
     }
 }

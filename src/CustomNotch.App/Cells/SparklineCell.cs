@@ -29,6 +29,6 @@ public sealed class SparklineCell : CellFace
         var h = m.Ring - 2 * inset;
         var max = Math.Max(points.Count > 0 ? points.Max() : 1, 1e-9);
         _line.Points = new PointCollection(points.Select((v, i) => new Point(inset + (points.Count > 1 ? i * w / (points.Count - 1) : w / 2), inset + h - v / max * h)));
-        Activity(view.Status, m);
+        Activity(view.Status, m, view.Activity, view.Shape);
     }
 }

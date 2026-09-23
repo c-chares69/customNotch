@@ -19,6 +19,6 @@ public sealed class ValueCell : CellFace
         if (_glyph is not null) Children.Remove(_glyph);
         _glyph = Glyph(view.Glyph, m, view.Stale);
         Children.Add(_glyph);
-        Activity(view.Status, m);
+        Activity(view.Status, m, view.Activity, view.Shape);
     }
 }
