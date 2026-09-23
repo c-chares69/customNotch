@@ -31,8 +31,8 @@ public sealed class PillEditor : UserControl
         screen.SelectedIndex = Math.Max(0, screens.FindIndex(s => s.Item1 == (pill.Screen ?? "")));
         screen.SelectionChanged += (_, _) => { if (screen.SelectedItem is ComboBoxItem it) run(() => ctx.Editor.SetPillLocal(pill.Id, p => { if ((string)it.Tag is { Length: > 0 } v) p["screen"] = v; else p.Remove("screen"); })); };
 
-        var along = Slider(pill.Along, 0, 1, 0.01, v => run(() => ctx.Editor.SetPillLocal(pill.Id, p => p["along"] = Math.Round(v, 3))), v => $"{Math.Round(v * 100)} %");
-        var scale = Slider(pill.Scale, 0.5, 2, 0.1, v => run(() => ctx.Editor.SetPillShared(pill.Id, p => p["scale"] = Math.Round(v, 1))), v => $"×{v:0.0}");
+        var along = Slider(pill.Along, 0, 1, 0.01, v => run(() => ctx.Editor.SetPillLocal(pill.Id, p => p["along"] = Math.Round(v, 3))), v => $"{Math.Round(v * 100)} %", "along");
+        var scale = Slider(pill.Scale, 0.5, 2, 0.1, v => run(() => ctx.Editor.SetPillShared(pill.Id, p => p["scale"] = Math.Round(v, 1))), v => $"×{v:0.0}", "scale");
         var visible = new CheckBox { Content = "Visible sur ce poste", IsChecked = pill.Visible };
         visible.Checked += (_, _) => run(() => ctx.Editor.SetPillLocal(pill.Id, p => p["visible"] = true));
         visible.Unchecked += (_, _) => run(() => ctx.Editor.SetPillLocal(pill.Id, p => p["visible"] = false));
@@ -54,11 +54,15 @@ public sealed class PillEditor : UserControl
     /// pixel. <paramref name="fmt"/> formate la valeur affichée (pourcentage pour une position, « ×1,0 » pour une
     /// échelle) — un curseur d'échelle à 0,5 ne doit pas afficher « 50 % ». Au démontage (changement de sélection ou de
     /// page pendant les 300 ms), une valeur en attente est validée tout de suite plutôt que perdue ou écrite à l'aveugle
-    /// après coup sur un éditeur qui n'existe plus.</summary>
-    private static UIElement Slider(double value, double min, double max, double step, Action<double> commit, Func<double, string> fmt)
+    /// après coup sur un éditeur qui n'existe plus. <paramref name="name"/> (facultatif) pose x:Name : comme pour
+    /// CellEditor, PillsPage.ShowEditor() s'en sert pour retrouver le même curseur dans l'éditeur reconstruit après
+    /// une écriture (300 ms après la dernière flèche au clavier) et y rendre le focus — sans ça, les flèches
+    /// perdent le focus au milieu d'un réglage.</summary>
+    private static UIElement Slider(double value, double min, double max, double step, Action<double> commit, Func<double, string> fmt, string? name = null)
     {
         var panel = new DockPanel { Width = 360, HorizontalAlignment = HorizontalAlignment.Left };
         var slider = new System.Windows.Controls.Slider { Minimum = min, Maximum = max, Value = value, TickFrequency = step, IsSnapToTickEnabled = true, VerticalAlignment = VerticalAlignment.Center };
+        if (name is { Length: > 0 }) slider.Name = name;
         var label = Ui.Text(fmt(value), 12, null, "Muted"); label.Width = 56; label.Margin = new Thickness(10, 0, 0, 0); label.VerticalAlignment = VerticalAlignment.Center;
         DockPanel.SetDock(label, Dock.Right);
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
