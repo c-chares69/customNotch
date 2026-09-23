@@ -44,7 +44,9 @@ public static class CellsJson
     {
         try
         {
-            return node.Deserialize<CellsFile>(Options) ?? new CellsFile();
+            var file = node.Deserialize<CellsFile>(Options) ?? new CellsFile();
+            file.Appearance ??= new();
+            return file;
         }
         catch (JsonException ex)
         {

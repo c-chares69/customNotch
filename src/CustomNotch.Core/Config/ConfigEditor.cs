@@ -285,4 +285,13 @@ public sealed class ConfigEditor
         mutate(entry);
         CommitShared(root);
     }
+
+    /// <summary>L'apparence est partagée entre machines, comme la forme des cellules : un seul bloc à la racine.</summary>
+    public void SetAppearance(Action<JsonObject> mutate)
+    {
+        var root = Shared();
+        if (root["appearance"] is not JsonObject a) root["appearance"] = a = new JsonObject();
+        mutate(a);
+        CommitShared(root);
+    }
 }

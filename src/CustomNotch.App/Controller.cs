@@ -170,10 +170,14 @@ public sealed class Controller : IPillHost
         var cell = _config.Current.Cell(cellId);
         if (cell is null) return null;
         var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        if (cell.IsGroup) return CellViews.FromGroup(cell, Children(cell), now);
+        var pill = PillOf(cell);
+        var appearance = _config.Current.Appearance;
+        if (cell.IsGroup) return CellViews.FromGroup(cell, Children(cell), now, pill, appearance);
         var reading = _readings.Get(cellId) ?? Reading.Empty;
-        return CellViews.From(cell, reading, now);
+        return CellViews.From(cell, reading, now, pill, appearance, Schema(cell.Source));
     }
+
+    private PillConfig? PillOf(CellConfig cell) => _config.Current.Pills.FirstOrDefault(p => p.Cells.Contains(cell));
 
     public IReadOnlyList<CellView> Children(CellConfig group)
         => (group.Children ?? new List<string>()).Select(View).Where(v => v is not null).Select(v => v!).ToList();

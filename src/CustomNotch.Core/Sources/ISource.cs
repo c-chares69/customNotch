@@ -18,8 +18,10 @@ public sealed record CellContext(string CellId, JsonObject Params, JsonObject? G
 public sealed record SchemaField(string Name, string Type, string Label, bool Required = false, string? Help = null, string? Default = null, IReadOnlyList<string>? Choices = null, string? Group = null);
 
 /// <summary>Ce qu'une source dit d'elle-même : son catalogue (Title, Description), ses champs, son glyph par défaut, et
-/// l'action qu'un clic sur la cellule déclenche quand la config n'en fixe pas (« open », « toggle »… ; null = la carte).</summary>
-public sealed record SourceSchema(string Type, string Title, IReadOnlyList<SchemaField> Fields, string? DefaultGlyph = null, string? Description = null, string? DefaultAction = null);
+/// l'action qu'un clic sur la cellule déclenche quand la config n'en fixe pas (« open », « toggle »… ; null = la carte).
+/// DefaultCaption : false pour une source dont le texte n'a pas sa place sous la cellule — le média : le titre est
+/// dans la carte.</summary>
+public sealed record SourceSchema(string Type, string Title, IReadOnlyList<SchemaField> Fields, string? DefaultGlyph = null, string? Description = null, string? DefaultAction = null, bool DefaultCaption = true);
 
 /// <summary>Le contrat de toute source : lire, agir, et pousser une mise à jour hors cadence.</summary>
 public interface ISource

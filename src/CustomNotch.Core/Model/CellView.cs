@@ -1,5 +1,6 @@
 using System.Globalization;
 using CustomNotch.Core.Config;
+using CustomNotch.Core.Sources;
 
 namespace CustomNotch.Core.Model;
 
@@ -16,20 +17,29 @@ public sealed record CellView(
     bool Stale,
     string? StaleAge,
     Reading Reading,
-    byte[]? Image);
+    byte[]? Image,
+    string Shape,
+    string Activity,
+    bool ShowCaption);
 
 public static class CellViews
 {
     private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
 
-    public static CellView From(CellConfig cell, Reading r, long nowMs)
+    public static CellView From(CellConfig cell, Reading r, long nowMs, PillConfig? pill = null, AppearanceConfig? appearance = null, SourceSchema? schema = null)
     {
         var kind = DeriveKind(cell, r);
         var status = DeriveStatus(cell, r);
         var stale = r.StaleSinceMs is not null;
+        var (shape, activity, showCaption) = Resolve(cell, pill, appearance, schema);
         return new CellView(cell.Id, kind, status, cell.Label ?? cell.Id, cell.Glyph, Caption(kind, r), Fraction(r), stale,
-            stale ? Age(nowMs - r.StaleSinceMs!.Value) : null, r, r.Image);
+            stale ? Age(nowMs - r.StaleSinceMs!.Value) : null, r, r.Image, shape, activity, showCaption);
     }
+
+    /// <summary>Ce que la cellule montre au-delà de sa lecture : la forme vient de la pilule, l'activité de la cellule
+    /// sinon de l'apparence globale, la légende de la cellule sinon du schéma de sa source. Pur, pour être testé.</summary>
+    public static (string Shape, string Activity, bool ShowCaption) Resolve(CellConfig cell, PillConfig? pill, AppearanceConfig? appearance, SourceSchema? schema)
+        => (pill?.CellsShape ?? "round", cell.Activity ?? appearance?.Activity ?? "dot", cell.Caption ?? schema?.DefaultCaption ?? true);
 
     /// <summary>L'ordre de décision : les enfants font toujours un groupe (la carte hover liste ses enfants, même
     /// si un kind a été forcé par erreur), sinon le kind explicite de la config, sinon la déduction depuis la
@@ -94,17 +104,18 @@ public static class CellViews
     /// <summary>La vue d'un groupe : l'anneau vient de l'enfant `headline` (ou, à défaut, du pire enfant s'il a
     /// une fraction, sinon du premier enfant qui en a une, sinon du pire) ; le statut est toujours le pire des
     /// enfants ; le groupe n'est périmé que si tous ses enfants le sont.</summary>
-    public static CellView FromGroup(CellConfig group, IReadOnlyList<CellView> children, long nowMs)
+    public static CellView FromGroup(CellConfig group, IReadOnlyList<CellView> children, long nowMs, PillConfig? pill = null, AppearanceConfig? appearance = null)
     {
+        var (shape, activity, showCaption) = Resolve(group, pill, appearance, null);
         if (children.Count == 0)
-            return new CellView(group.Id, CellKind.Group, Status.Off, group.Label ?? group.Id, group.Glyph, null, null, false, null, Reading.Empty, null);
+            return new CellView(group.Id, CellKind.Group, Status.Off, group.Label ?? group.Id, group.Glyph, null, null, false, null, Reading.Empty, null, shape, activity, showCaption);
         var worst = children.MinBy(c => Rank(c.Status))!;
         var headline = (group.Headline is { } h ? children.FirstOrDefault(c => c.Id == h) : null)
             ?? (worst.Fraction is not null ? worst : children.FirstOrDefault(c => c.Fraction is not null) ?? worst);
         var stale = children.All(c => c.Stale);
         var oldest = stale ? children.Min(c => c.Reading.StaleSinceMs ?? nowMs) : (long?)null;
         return new CellView(group.Id, CellKind.Group, worst.Status, group.Label ?? group.Id, group.Glyph, headline.Caption, headline.Fraction, stale,
-            stale ? Age(nowMs - oldest!.Value) : null, headline.Reading, headline.Image);
+            stale ? Age(nowMs - oldest!.Value) : null, headline.Reading, headline.Image, shape, activity, showCaption);
     }
 
     public static string Age(long ms)

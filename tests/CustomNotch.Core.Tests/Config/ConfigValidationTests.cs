@@ -102,4 +102,24 @@ public class ConfigValidationTests
         var f = File("""{"pills":[{"id":"p","cells":[{"id":"a","source":"nope"}]}]}""");
         Assert.Contains(ConfigValidation.Validate(f, Schemas), e => e.Contains("source « nope » inconnue"));
     }
+
+    [Fact]
+    public void Une_forme_ou_une_echelle_inconnue_est_refusee()
+    {
+        var f = new CellsFile
+        {
+            Appearance = new AppearanceConfig { Activity = "dot", CardScale = 3 },
+            Pills = new List<PillConfig>
+            {
+                new() { Id = "p", Edge = "right", CellsShape = "hex", Cells = new List<CellConfig>
+                {
+                    new() { Id = "c", Source = "system.cpu", Activity = "blink" },
+                } },
+            },
+        };
+        var errors = ConfigValidation.Validate(f, Known);
+        Assert.Contains(errors, e => e.Contains("cellsShape"));
+        Assert.Contains(errors, e => e.Contains("cardScale"));
+        Assert.Contains(errors, e => e.Contains("activity"));
+    }
 }

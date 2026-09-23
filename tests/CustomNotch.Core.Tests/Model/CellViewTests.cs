@@ -1,5 +1,6 @@
 using CustomNotch.Core.Config;
 using CustomNotch.Core.Model;
+using CustomNotch.Core.Sources;
 using Xunit;
 namespace CustomNotch.Core.Tests.Model;
 
@@ -93,5 +94,43 @@ public class CellViewTests
         var bytes = new byte[] { 1, 2, 3 };
         var view = CellViews.From(Cell(), new Reading(Text: "x", Image: bytes), 0);
         Assert.Same(bytes, view.Image);
+    }
+
+    [Fact]
+    public void La_forme_et_l_activite_viennent_de_la_pilule_et_de_l_apparence()
+    {
+        var pill = new PillConfig { Id = "p", CellsShape = "square" };
+        var app = new AppearanceConfig { Activity = "ring" };
+        var cell = new CellConfig { Id = "c", Source = "system.cpu" };
+        var v = CellViews.From(cell, new Reading(Value: 3, Max: 100), 0, pill, app);
+        Assert.Equal("square", v.Shape);
+        Assert.Equal("ring", v.Activity);
+        Assert.True(v.ShowCaption);
+    }
+
+    [Fact]
+    public void La_cellule_surcharge_l_activite_et_la_legende()
+    {
+        var cell = new CellConfig { Id = "c", Source = "system.cpu", Activity = "dot", Caption = false };
+        var v = CellViews.From(cell, new Reading(Value: 3, Max: 100), 0, null, new AppearanceConfig { Activity = "ring" });
+        Assert.Equal("dot", v.Activity);
+        Assert.False(v.ShowCaption);
+    }
+
+    [Fact]
+    public void Le_schema_de_la_source_fixe_la_legende_par_defaut()
+    {
+        var schema = new SourceSchema("media", "Média", Array.Empty<SchemaField>(), "music", "", "toggle", DefaultCaption: false);
+        var v = CellViews.From(new CellConfig { Id = "m", Source = "media" }, new Reading(Text: "Titre"), 0, null, null, schema);
+        Assert.False(v.ShowCaption);
+        var forced = CellViews.From(new CellConfig { Id = "m", Source = "media", Caption = true }, new Reading(Text: "Titre"), 0, null, null, schema);
+        Assert.True(forced.ShowCaption);
+    }
+
+    [Fact]
+    public void Sans_options_les_defauts_sont_rond_pastille_legende()
+    {
+        var v = CellViews.From(new CellConfig { Id = "c" }, new Reading(Text: "x"), 0);
+        Assert.Equal("round", v.Shape); Assert.Equal("dot", v.Activity); Assert.True(v.ShowCaption);
     }
 }

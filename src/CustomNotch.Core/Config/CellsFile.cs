@@ -36,6 +36,10 @@ public sealed class CellConfig
     public string? Headline { get; set; }
     public CellActions? Actions { get; set; }
     public bool Visible { get; set; } = true;
+    /// <summary>null = selon la source (SourceSchema.DefaultCaption) ; false = jamais de texte sous la cellule.</summary>
+    public bool? Caption { get; set; }
+    /// <summary>dot | ring ; null = l'apparence globale.</summary>
+    public string? Activity { get; set; }
 
     public bool IsGroup => Children is { Count: > 0 };
 
@@ -70,8 +74,20 @@ public sealed class PillConfig
     public double Scale { get; set; } = 1.0;
     public bool Visible { get; set; } = true;
     public List<CellConfig> Cells { get; set; } = new();
+    /// <summary>round | square : la forme de toutes les cellules de la pilule.</summary>
+    public string CellsShape { get; set; } = "round";
 
     public bool IsVertical => Edge is "left" or "right";
+}
+
+/// <summary>L'apparence commune à toutes les pilules (partagée entre machines) : l'indicateur d'activité et l'échelle
+/// de la carte au survol. Les formes sont par pilule, la légende et l'activité surchargées par cellule.</summary>
+public sealed class AppearanceConfig
+{
+    /// <summary>dot : Busy/Attention ne colorent que la pastille ; ring : l'arc animé autour de la cellule.</summary>
+    public string Activity { get; set; } = "dot";
+    /// <summary>1.0 à 1.5 : la carte au survol est agrandie d'autant (texte compris).</summary>
+    public double CardScale { get; set; } = 1.0;
 }
 
 /// <summary>Le fichier cells.json une fois fusionné avec la surcharge locale et les placeholders résolus.</summary>
@@ -81,6 +97,7 @@ public sealed class CellsFile
     public List<PillConfig> Pills { get; set; } = new();
     /// <summary>Réglages globaux par type de source (« claude »: { … }), laissés en JSON.</summary>
     public JsonObject? Sources { get; set; }
+    public AppearanceConfig Appearance { get; set; } = new();
 
     public IEnumerable<CellConfig> AllCells() => Pills.SelectMany(p => p.Cells);
     public CellConfig? Cell(string id) => AllCells().FirstOrDefault(c => c.Id == id);

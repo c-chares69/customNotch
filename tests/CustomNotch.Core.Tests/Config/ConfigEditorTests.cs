@@ -113,6 +113,14 @@ public class ConfigEditorTests : IDisposable
     }
 
     [Fact]
+    public void SetAppearance_ecrit_le_bloc_partage()
+    {
+        _editor.SetAppearance(a => a["activity"] = "ring");
+        Assert.Equal("ring", _store.Current.Appearance.Activity);
+        Assert.Contains("\"appearance\"", Shared());
+    }
+
+    [Fact]
     public void Un_fichier_verrouille_fait_echouer_l_operation_au_lieu_de_l_ignorer()
     {
         using var lockHandle = new FileStream(_store.CellsPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);

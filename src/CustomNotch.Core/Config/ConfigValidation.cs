@@ -15,6 +15,8 @@ public static class ConfigValidation
         var errors = new List<string>();
         var pillIds = new HashSet<string>();
         var cellIds = new HashSet<string>();
+        if (file.Appearance.Activity is not ("dot" or "ring")) errors.Add("appearance.activity : attendu dot ou ring");
+        if (file.Appearance.CardScale is < 1 or > 1.5) errors.Add("appearance.cardScale : attendu entre 1 et 1.5");
         for (var i = 0; i < file.Pills.Count; i++)
         {
             var pill = file.Pills[i];
@@ -24,6 +26,7 @@ public static class ConfigValidation
             if (!Edges.Contains(pill.Edge)) errors.Add($"{at}.edge « {pill.Edge} » : attendu left, right, top ou bottom");
             if (pill.Along is < 0 or > 1) errors.Add($"{at}.along : attendu entre 0 et 1");
             if (pill.Scale is < 0.5 or > 3) errors.Add($"{at}.scale : attendu entre 0.5 et 3");
+            if (pill.CellsShape is not ("round" or "square")) errors.Add($"{at}.cellsShape « {pill.CellsShape} » : attendu round ou square");
             for (var j = 0; j < pill.Cells.Count; j++)
             {
                 var cell = pill.Cells[j];
@@ -33,6 +36,7 @@ public static class ConfigValidation
                 if (!cell.IsGroup && !knownSources.Contains(cell.Source)) errors.Add($"{cat}.source « {cell.Source} » inconnue");
                 if (cell.Refresh is not null && cell.RefreshSpan() is null) errors.Add($"{cat}.refresh « {cell.Refresh} » : attendu 500ms, 2s, 5m ou 1h");
                 if (cell.Kind is not null && !Kinds.Contains(cell.Kind.ToLowerInvariant())) errors.Add($"{cat}.kind « {cell.Kind} » : attendu ring, value, status, sparkline ou group");
+                if (cell.Activity is not null and not ("dot" or "ring")) errors.Add($"{cat}.activity « {cell.Activity} » : attendu dot ou ring");
             }
         }
         foreach (var cell in file.AllCells().Where(c => c.IsGroup))
