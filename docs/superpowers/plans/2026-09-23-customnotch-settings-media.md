@@ -1009,7 +1009,7 @@ public sealed class ConfigEditor
 
 - [ ] **Step 4: Tests verts**
 
-Run: `dotnet test tests/CustomNotch.Core.Tests` (après la tâche 3 pour le nouveau défaut)
+Run: `dotnet test tests/CustomNotch.Core.Tests` (après la tâche 2, qui pose le nouveau défaut)
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
