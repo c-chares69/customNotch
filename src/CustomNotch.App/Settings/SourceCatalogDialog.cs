@@ -22,8 +22,10 @@ public sealed class SourceCatalogDialog : Window
         FontFamily = (System.Windows.Media.FontFamily)FindResource("UiFont");
         _all = registry.Schemas.Values.OrderBy(s => s.Title).ToList();
 
-        var filter = new TextBox { Margin = new Thickness(0, 0, 0, 10) };
+        var filter = new TextBox { Margin = new Thickness(0, 0, 0, 10), Padding = new Thickness(10, 7, 10, 7) };
+        filter.SetResourceReference(StyleProperty, "Field");
         filter.TextChanged += (_, _) => Fill(filter.Text);
+        _list.SetResourceReference(StyleProperty, "TreeList");
         _list.MouseDoubleClick += (_, _) => Accept();
         var ok = new Button { Content = "Ajouter", MinWidth = 100, Margin = new Thickness(8, 0, 0, 0), IsDefault = true }; ok.SetResourceReference(StyleProperty, "Primary"); ok.Click += (_, _) => Accept();
         var cancel = new Button { Content = "Annuler", MinWidth = 100, IsCancel = true }; cancel.SetResourceReference(StyleProperty, "Secondary");

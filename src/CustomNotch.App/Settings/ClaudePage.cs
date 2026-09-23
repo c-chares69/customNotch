@@ -22,38 +22,33 @@ public sealed class ClaudePage : PageBase
     private readonly TextBlock _lastRenewal = Ui.Text("—");
     private readonly StackPanel _sessions = new();
 
-    public ClaudePage(SettingsContext ctx) : base(ctx, "Claude", "Connexion, jeton, usage et sessions Claude Code en cours.")
+    public ClaudePage(SettingsContext ctx) : base(ctx, "Claude", "Compte, jeton, lecture, sessions.")
     {
         _claude = ctx.Registry.Get("claude") as ClaudeSource;
 
-        var home = Debounced(HomeValue(), v => Try(() => Ctx.Editor.SetSourceGlobal("claude", s =>
+        var home = Bricks.Text(this, "Dossier .claude (autre compte)", HomeValue(), v => Try(() => Ctx.Editor.SetSourceGlobal("claude", s =>
         {
-            if (string.IsNullOrWhiteSpace(v)) s.Remove("home"); else s["home"] = v;
+            if (v.Length == 0) s.Remove("home"); else s["home"] = v;
         })));
 
         Body.Children.Add(Banner);
-        Body.Children.Add(Section("Compte"));
-        Body.Children.Add(Card(Stack(
-            Row("Abonnement", _plan),
-            Row("Palier", _tier),
-            Row("Jeton", _token),
-            Row("CLI Claude", _cli),
-            Row("Dossier .claude (autre compte)", home))));
+        Body.Children.Add(Bricks.Card(this, "Compte",
+            Bricks.Row("Abonnement", _plan),
+            Bricks.Row("Palier", _tier),
+            Bricks.Row("Jeton", _token),
+            Bricks.Row("CLI Claude", _cli),
+            Bricks.Action(this, "Se connecter", () => _claude?.SignIn?.Invoke(), primary: true)));
 
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 4) };
-        buttons.Children.Add(Btn("Se connecter", () => _claude?.SignIn?.Invoke()));
-        buttons.Children.Add(Btn("Relire maintenant", () => _claude?.RefreshAll()));
-        Body.Children.Add(buttons);
+        Body.Children.Add(Bricks.Card(this, "Dossier", home));
 
-        Body.Children.Add(Section("Lecture"));
-        Body.Children.Add(Card(Stack(
-            Row("Dernière lecture", _lastRead),
-            Row("Dernière erreur", _lastError),
-            Row("Prochain essai", _nextAttempt),
-            Row("Dernier renouvellement", _lastRenewal))));
+        Body.Children.Add(Bricks.Card(this, "Lecture",
+            Bricks.Row("Dernière lecture", _lastRead),
+            Bricks.Row("Dernière erreur", _lastError),
+            Bricks.Row("Prochain essai", _nextAttempt),
+            Bricks.Row("Dernier renouvellement", _lastRenewal),
+            Bricks.Action(this, "Relire maintenant", () => _claude?.RefreshAll())));
 
-        Body.Children.Add(Section("Sessions"));
-        Body.Children.Add(Card(_sessions));
+        Body.Children.Add(Bricks.Card(this, "Sessions", _sessions));
 
         if (_claude is not null)
         {
@@ -83,7 +78,7 @@ public sealed class ClaudePage : PageBase
         var sessions = status?.Sessions ?? Array.Empty<ClaudeSession>();
         if (sessions.Count == 0)
         {
-            _sessions.Children.Add(Ui.Text("Aucune session Claude Code en cours.", 12, null, "Muted"));
+            _sessions.Children.Add(Bricks.Hint(this, "Aucune session Claude Code en cours."));
             return;
         }
         var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -107,11 +102,4 @@ public sealed class ClaudePage : PageBase
     };
 
     private static string Clock(long ms) => DateTimeOffset.FromUnixTimeMilliseconds(ms).ToLocalTime().ToString("HH:mm");
-
-    private static StackPanel Stack(params UIElement[] children)
-    {
-        var s = new StackPanel();
-        foreach (var c in children) s.Children.Add(c);
-        return s;
-    }
 }

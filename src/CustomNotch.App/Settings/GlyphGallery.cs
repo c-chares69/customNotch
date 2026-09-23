@@ -11,7 +11,7 @@ namespace CustomNotch.App.Settings;
 /// pour revenir au glyph par défaut de la source — et un champ pour coller un tracé SVG.</summary>
 public static class GlyphGallery
 {
-    public static UIElement Build(string? current, Action<string?> onPick)
+    public static UIElement Build(FrameworkElement host, string? current, Action<string?> onPick)
     {
         var stack = new StackPanel();
         var grid = new WrapPanel { MaxWidth = 460 };
@@ -73,7 +73,7 @@ public static class GlyphGallery
         // valeur en attente est validée tout de suite plutôt que perdue ou écrite après coup sur une galerie qui
         // n'existe plus.
         raw.Unloaded += (_, _) => { if (timer.IsEnabled) Flush(); };
-        var hint = Ui.Text("Ou un tracé SVG (commence par M) — grille 16×16 pour un trait, 24×24 pour un plein.", 11, null, "Muted");
+        var hint = Bricks.Hint(host, "Ou un tracé SVG (commence par M) — grille 16×16 pour un trait, 24×24 pour un plein.");
         stack.Children.Add(raw);
         stack.Children.Add(hint);
         return stack;

@@ -547,11 +547,18 @@ title, children…)` (titre en capitales, cases à cocher sur deux colonnes à p
 `Page(cards…)`, `Row(label, field)` (`Ui.FormRow`, libellé 240 px), `Hint(host, text)`,
 `Problem(host)` / `Say(problem, text)` (message sous un champ fautif, couleur Warn — pas Danger),
 `Check`, `Combo`, `Number` (champ 110 px + − / + + suffixe), `Text` (commit à l'Entrée ou à la
-perte du focus, `validate` rend le message d'erreur ou `null`), `Action` (bouton `Primary` /
-`Secondary`) : les pages les adoptent une à une (Task 2 du plan 0.3.2) ; en attendant, les
-anciennes signatures (`Section`, `Card(content)`, `Row(label, field, labelWidth)`, `Combo` sans
-hôte, `Debounced`, `Btn`, `Slider`) restent, inchangées, pour que les pages non recomposées
-continuent de compiler et de se comporter à l'identique.
+perte du focus, `validate` rend le message d'erreur ou `null` — pas d'anti-rebond, le modèle
+SettingsPages), `Action` (bouton `Primary` / `Secondary`), `Field` (champ nu, même commit que
+`Text` mais sans libellé ni ligne de formulaire — pour composer une ligne à plusieurs champs :
+seuils avertir/critique, valeur d'une action de carte), `Btn` (bouton compact d'une barre d'outils,
+même style que `Action` mais sans le gabarit d'une carte). Toutes les pages et les deux éditeurs
+(`PillEditor`, `CellEditor`) les appellent directement depuis Task 2 (0.3.2) ; `Debounced` et
+`Slider` restent, réservés au libellé d'une cellule et au tracé SVG d'un glyph (la frappe doit s'y
+appliquer en direct), et aux curseurs (position, échelle) — partout ailleurs, un champ texte
+commit à l'Entrée ou à la perte du focus, sans anti-rebond 300 ms. Les anciennes signatures
+d'avant Task 2 (`Section`, `Card(content)` à un seul argument, `Row` à 220 px par défaut, `Combo`
+et `Btn` sans hôte) ont disparu avec la dernière page qui les appelait ; `PageBase` n'a plus de
+forwarders, chaque page appelle `Bricks.*` directement.
 
 - **Page « Pilules & cellules »** — maître-détail : un arbre pilule → cellules à gauche
   (`PillsPage`, cellule masquée grisée, enfants d'un groupe indentés dessous) avec une barre
@@ -566,36 +573,42 @@ continuent de compiler et de se comporter à l'identique.
   de rendu, cadence, seuils warn/crit + inversé), **Actions** (clic et boutons de carte, chacun
   une action au choix), **Groupe** (cases sur les autres cellules de la pilule, tête parmi les
   cochées).
-- **`SchemaForm.Build(SourceSchema, params, onChange)`** génère une rangée par champ, groupée
+- **`SchemaForm.Build(SourceSchema, params, onChange, onSecret)`** — signature inchangée depuis
+  0.3.0 (`SchemaFormTests` reste sur ses fonctions pures) — génère une rangée par champ, groupée
   par `SchemaField.Group` ; contrôle par type : `string` → champ texte, `number` → champ
-  numérique validé, `bool` → case, `choice` → liste, `path` → champ + « … », `url` → champ
-  validé, `secret` → champ masqué avec état « défini » + « Effacer ». `SchemaForm.ControlKind`
+  numérique (message « n'est pas un nombre » sous le champ, style `Problem`, plutôt qu'une bordure
+  rouge), `bool` → case, `choice` → liste, `path` → champ + « … », `url` → champ, `secret` →
+  champ masqué avec état « défini » + « Enregistrer » / « Effacer ». Champ stylé « Field », commit
+  à l'Entrée ou à la perte du focus (plus d'anti-rebond 300 ms). Pas de `FrameworkElement` hôte
+  propre : les styles sont posés par `SetResourceReference` (comme `Ui`), pas par
+  `host.FindResource` — `Application.Resources` les porte déjà (`App.xaml`). `SchemaForm.ControlKind`
   est une fonction pure, testée sans fenêtre.
-- **Page « Sources »** : une section par type de source ayant des réglages globaux (aucun dans
-  cette version — ClickUp en aura un, plan 0.4.0 §10 — la page le dit) et la liste des secrets de
-  `secrets.json` : nom, « défini » (jamais la valeur), Effacer.
+- **Page « Sources »** : une carte par type de source ayant des réglages globaux (aucun dans
+  cette version — ClickUp en aura un, plan 0.4.0 §10 — la carte le dit) et la carte **Secrets**
+  (liste de `secrets.json` : nom, « défini » (jamais la valeur), Effacer, indication DPAPI).
 - **Page « Claude »** (`ClaudePage`) — carte **Compte** : abonnement, palier, jeton (« valide
   jusqu'à 18:32 » / « expiré » / « aucun jeton »), CLI trouvé (chemin) ou non (« introuvable —
-  winget install Anthropic.ClaudeCode »), champ **dossier .claude** (autre compte, réglage global
-  de la source, `ConfigEditor.SetSourceGlobal("claude", …)`) ; boutons **Se connecter**
-  (`ClaudeSource.SignIn`) et **Relire maintenant** (`ClaudeSource.RefreshAll()`) ; carte
+  winget install Anthropic.ClaudeCode »), bouton **Se connecter** (`ClaudeSource.SignIn`,
+  `Primary`) ; carte **Dossier** : champ **dossier .claude** (autre compte, réglage global de la
+  source, `ConfigEditor.SetSourceGlobal("claude", …)`, commit à l'Entrée / perte du focus) ; carte
   **Lecture** : dernière lecture, dernière erreur, prochain essai (backoff), dernier
-  renouvellement ; carte **Sessions** : une ligne par session (nom — état — depuis). Se
-  rafraîchit sur `ClaudeSource.StatusChanged` (marshalé sur le `Dispatcher`, désabonné à
-  `Detach()` comme `OnStoreChanged`) — jamais un minuteur propre, jamais le jeton affiché.
-- **Page « Général »** : emplacement de `cells.json` (chemin, Parcourir…, Ouvrir le dossier,
-  « prise en compte au redémarrage »), une carte **Apparence** —
-  **indicateur d'activité** (Combo « Pastille seule » / « Anneau animé », `Appearance.Activity`,
-  partagé) et **échelle de la carte** (curseur 100 % à 150 % par pas de 5, `Appearance.CardScale`)
-  —, une carte **Mises à jour** (0.3.1, ci-dessous), une carte **Journal et diagnostic**
-  (0.3.1, ci-dessous), puis démarrage automatique (`Autostart`, case reflétant la clé Run — la
-  tâche planifiée de l'installateur, §8, fait le même effet sans cette case), thème système/
-  clair/sombre (`config.json → appearance.theme`, `Theme.Apply` immédiat), version, lien vers le
-  dépôt.
+  renouvellement, bouton **Relire maintenant** (`ClaudeSource.RefreshAll()`) ; carte
+  **Sessions** : une ligne par session (nom — état — depuis). Se rafraîchit sur
+  `ClaudeSource.StatusChanged` (marshalé sur le `Dispatcher`, désabonné à `Detach()` comme
+  `OnStoreChanged`) — jamais un minuteur propre, jamais le jeton affiché.
+- **Page « Général »** : carte **Configuration** — emplacement de `cells.json` (chemin,
+  Parcourir…, Ouvrir le dossier, « prise en compte au redémarrage ») — puis une carte
+  **Apparence** — **indicateur d'activité** (Combo « Pastille seule » / « Anneau animé »,
+  `Appearance.Activity`, partagé), **échelle de la carte** (curseur 100 % à 150 % par pas de 5,
+  `Appearance.CardScale`) et thème système/clair/sombre (`config.json → appearance.theme`,
+  `Theme.Apply` immédiat) —, une carte **Mises à jour** (0.3.1, ci-dessous), une carte **Journal
+  et diagnostic** (0.3.1, ci-dessous), une carte **Poste** (démarrage automatique — `Autostart`,
+  case reflétant la clé Run ; la tâche planifiée de l'installateur, §8, fait le même effet sans
+  cette case), une carte **À propos** (version, lien vers le dépôt).
 - **Carte « Mises à jour »** (0.3.1) : case *Vérifier automatiquement* (`updates.enabled`,
   vraie par défaut), champ *Adresse du manifeste* (`updates.url` — vide, l'adresse par défaut
-  s'affiche en gris en dessous, `Updates.DefaultManifestUrl` : le dépôt public GitHub, §8),
-  curseur *Toutes les … h* (`updates.interval_hours`, 1-720, 24 par défaut), boutons
+  s'affiche en infobulle, `Updates.DefaultManifestUrl` : le dépôt public GitHub, §8),
+  champ numérique *Toutes les … h* (`updates.interval_hours`, 1-720, 24 par défaut), boutons
   **Vérifier maintenant** (`UpdateChecker.Check(manual: true)`), **Installer** (visible quand
   `UpdateChecker.Latest` n'est pas nul — `Prepare(latest)`, téléchargement vérifié puis
   décompression) et **Ignorer cette version** (`Skip`), ligne de statut alimentée par
@@ -608,19 +621,24 @@ continuent de compiler et de se comporter à l'identique.
 - **Carte « Journal et diagnostic »** (0.3.1) : Ouvrir le journal (inchangé), **Signaler un
   problème…** — `Diagnostics.MakeReport()` sur un `Task.Run` (jamais sur le thread UI), puis un
   texte « Rapport déposé sur le Bureau : … » ; voir « `--report` » ci-dessous et §8.
-- **Toute modification passe par `ConfigEditor`** (anti-rebond 300 ms sur les champs texte),
-  qui route chaque champ vers le bon fichier : le partagé (`cells.json`, un choix de
-  configuration), le local (`cells.<machine>.json` — visibilité d'une cellule, comme la
-  position d'un drag) ou `secrets.json` (champ `secret` : la valeur y va chiffrée, `params`
-  garde `${secret:<cellId>.<champ>}`). Une écriture refusée (`ConfigException`) affiche un
-  bandeau (`EditorBanner`, fond Warn et texte sombre — comme le `Banner` de `HubWindow.xaml`) en
-  tête de l'éditeur sans perdre la valeur saisie, qui reste
-  dans son champ pour être corrigée ; le focus clavier est restauré après la reconstruction
-  d'un champ modifié pendant la frappe (curseurs, `TextBox`), pour qu'une flèche ou une lettre
-  suivante ne parte pas dans le vide. `cells.json` est réécrit avec un en-tête fixe de deux
-  lignes ; ses commentaires manuels ne sont plus conservés (System.Text.Json ne les garde pas)
-  — assumé : le fichier n'est plus fait pour être édité à la main, même s'il reste lisible et
-  synchronisable.
+- **Toute modification passe par `ConfigEditor`**, qui route chaque champ vers le bon fichier :
+  le partagé (`cells.json`, un choix de configuration), le local (`cells.<machine>.json` —
+  visibilité d'une cellule, comme la position d'un drag) ou `secrets.json` (champ `secret` : la
+  valeur y va chiffrée, `params` garde `${secret:<cellId>.<champ>}`). Un champ texte commit à
+  l'Entrée ou à la perte du focus (`Bricks.Text`/`Field`, `SchemaForm`, comme `SettingsPages` —
+  ClickUp-Extended) ; seuls le libellé d'une cellule et le tracé SVG d'un glyph gardent
+  l'anti-rebond 300 ms (`Bricks.Debounced`) — la frappe doit s'y appliquer en direct. Une écriture
+  refusée (`ConfigException`) affiche un bandeau (`EditorBanner`, fond Warn et texte sombre —
+  comme le `Banner` de `HubWindow.xaml`) en tête de l'éditeur sans perdre la valeur saisie, qui
+  reste dans son champ pour être corrigée ; le focus clavier est restauré après la reconstruction
+  d'un champ modifié pendant la frappe (curseurs, `TextBox` nommés par `x:Name` : `label`,
+  `refresh`, `warn`, `crit`, `click`, `act_label_*`, `act_value_*`, `param_*`, `svg`, `along`,
+  `scale`), pour qu'une flèche ou une lettre suivante ne parte pas dans le vide. `cells.json` est
+  réécrit avec un en-tête fixe de deux lignes ; ses commentaires manuels ne sont plus conservés
+  (System.Text.Json ne les garde pas) — assumé : le fichier n'est plus fait pour être édité à la
+  main, même s'il reste lisible et synchronisable.
+- **`SourceCatalogDialog`** (« + Cellule », « Changer de source ») : filtre stylé « Field », liste
+  stylée `TreeList` (survol et sélection teintés d'accent, comme l'arbre de `PillsPage`).
 - **Ce qui n'est pas dans l'UI** : rien — chaque champ de `cells.json`, `cells.<machine>.json`
   et `secrets.json` se règle depuis une page.
 

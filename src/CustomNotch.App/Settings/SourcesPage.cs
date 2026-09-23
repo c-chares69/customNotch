@@ -4,22 +4,20 @@ using CustomNotch.Core.Config;
 
 namespace CustomNotch.App.Settings;
 
-/// <summary>Les réglages globaux par type de source (aucun dans cette version : la page le dit) et la liste des secrets —
+/// <summary>Les réglages globaux par type de source (aucun dans cette version : la carte le dit) et la liste des secrets —
 /// leurs noms, jamais leurs valeurs.</summary>
 public sealed class SourcesPage : PageBase
 {
     private readonly EditorBanner _banner = new();
     private readonly StackPanel _secrets = new();
 
-    public SourcesPage(SettingsContext ctx) : base(ctx, "Sources", "Ce qui vaut pour toutes les cellules d'un même type, et les secrets chiffrés sur ce poste.")
+    public SourcesPage(SettingsContext ctx) : base(ctx, "Sources", "Réglages globaux par type de source et secrets.")
     {
         Body.Children.Add(_banner);
-        var none = Ui.Text("Aucune source livrée avec cette version n'a de réglage global. Claude Code et ClickUp en auront.", 12, null, "Muted");
-        none.TextWrapping = TextWrapping.Wrap;
-        Body.Children.Add(Section("Réglages globaux"));
-        Body.Children.Add(Card(none));
-        Body.Children.Add(Section("Secrets (secrets.json, chiffrés avec ton compte Windows)"));
-        Body.Children.Add(Card(_secrets));
+        Body.Children.Add(Bricks.Card(this, "Réglages globaux",
+            Bricks.Hint(this, "Aucune source livrée avec cette version n'a de réglage global. Claude Code et ClickUp en auront.")));
+        Body.Children.Add(Bricks.Card(this, "Secrets", _secrets,
+            Bricks.Hint(this, "secrets.json, chiffré avec ton compte Windows (DPAPI).")));
         OnStoreChanged(Refresh);
     }
 
@@ -33,7 +31,7 @@ public sealed class SourcesPage : PageBase
             var row = new DockPanel { Margin = new Thickness(0, 3, 0, 3) };
             // Retirer un secret qu'un champ requis résout encore est refusé (ConfigEditor restaure la valeur) :
             // le message remonte ici, sous la liste, plutôt que de disparaître dans une exception non attrapée.
-            var remove = Btn("Effacer", () =>
+            var remove = Bricks.Btn(this, "Effacer", () =>
             {
                 try { Ctx.Editor.RemoveSecret(name); _banner.Clear(); }
                 catch (ConfigException ex) { _banner.Show(ex.Message); }

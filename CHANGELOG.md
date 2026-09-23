@@ -5,9 +5,16 @@
 - **La fenêtre Réglages au gabarit de ClickUp-Extended.** Coquille refaite sur le patron de
   `HubWindow.xaml` (sidebar 240 px avec marque et navigation à glyph, en-tête de page dessiné par
   la fenêtre, défilement rembourré, pied Fermer inchangé) et briques refaites sur le patron de
-  `SettingsPages` (`Card`, `Row`, `Hint`, `Problem`, `Check`, `Combo`, `Number`, `Text`, `Action`) ;
-  les pages seront recomposées avec ces briques dans une prochaine version, sans changement de
-  comportement en attendant.
+  `SettingsPages` (`Card`, `Row`, `Hint`, `Problem`, `Check`, `Combo`, `Number`, `Text`, `Action`,
+  `Field`, `Btn`).
+- **Toutes les pages recomposées avec ces briques** — Général, Sources, Claude, Pilules &
+  cellules (`PillEditor`, `CellEditor`, `SchemaForm`, `GlyphGallery`) et le catalogue de sources
+  (`SourceCatalogDialog`, filtre et liste thémés) : mêmes clés de configuration, mêmes appels
+  `ConfigEditor`, mêmes bandeaux d'erreur qu'avant — mais un champ texte commit désormais à
+  l'Entrée ou à la perte du focus plutôt qu'après un anti-rebond de 300 ms, comme
+  ClickUp-Extended ; seuls le libellé d'une cellule et le tracé SVG d'un glyph gardent la frappe
+  en direct. Un nombre refusé dans le formulaire d'une source (`SchemaForm`) le dit sous le champ
+  plutôt que par une bordure rouge.
 
 ## 0.3.1 - 2026-09-23
 

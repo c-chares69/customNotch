@@ -19,7 +19,7 @@ public sealed class PillsPage : PageBase
     /// (un seul ShowEditor() par rafraîchissement, jamais deux).</summary>
     private bool _refreshing;
 
-    public PillsPage(SettingsContext ctx) : base(ctx, "Pilules & cellules", "Chaque pilule est ancrée à un bord ; ses cellules lisent une source. Tout s'applique immédiatement.")
+    public PillsPage(SettingsContext ctx) : base(ctx, "Pilules & cellules", "Ce que montre chaque pilule.")
     {
         _tree.SetResourceReference(StyleProperty, "TreeList");
         _tree.SelectionChanged += (_, _) =>
@@ -29,18 +29,18 @@ public sealed class PillsPage : PageBase
         };
 
         var tools = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
-        tools.Children.Add(Btn("+ Pilule", () => Try(() => Select("pill", Ctx.Editor.AddPill("right")))));
-        tools.Children.Add(Btn("+ Cellule", AddCell, "Primary"));
-        tools.Children.Add(Btn("↑", () => Move(-1)));
-        tools.Children.Add(Btn("↓", () => Move(+1)));
-        _hide = Btn("Masquer", ToggleVisible);
+        tools.Children.Add(Bricks.Btn(this, "+ Pilule", () => Try(() => Select("pill", Ctx.Editor.AddPill("right")))));
+        tools.Children.Add(Bricks.Btn(this, "+ Cellule", AddCell, "Primary"));
+        tools.Children.Add(Bricks.Btn(this, "↑", () => Move(-1)));
+        tools.Children.Add(Bricks.Btn(this, "↓", () => Move(+1)));
+        _hide = Bricks.Btn(this, "Masquer", ToggleVisible);
         tools.Children.Add(_hide);
-        tools.Children.Add(Btn("Supprimer", Remove, "GhostButton"));
+        tools.Children.Add(Bricks.Btn(this, "Supprimer", Remove, "GhostButton"));
 
-        var left = new DockPanel { Width = 300, Margin = new Thickness(0, 0, 20, 0) };
+        var left = new DockPanel { Width = 280, Margin = new Thickness(0, 0, 20, 0) };
         DockPanel.SetDock(tools, Dock.Top);
         left.Children.Add(tools);
-        left.Children.Add(Card(_tree));
+        left.Children.Add(Bricks.Card(this, "Pilules", _tree));
 
         var right = new StackPanel();
         right.Children.Add(Banner);

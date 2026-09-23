@@ -12,13 +12,12 @@ public sealed class GeneralPage : PageBase
     private static readonly (string, string)[] Themes = { ("system", "Automatique (suit Windows)"), ("light", "Clair"), ("dark", "Sombre") };
     private static readonly (string, string)[] Activities = { ("dot", "Pastille seule"), ("ring", "Anneau animé") };
     private readonly TextBox _cellsPath;
-    private readonly CheckBox _autostart = new() { Content = "Lancer customNotch à l'ouverture de session" };
-    private readonly TextBlock _autostartError = Ui.Text("Impossible de modifier le démarrage automatique.", 11, null, "Muted");
+    private readonly TextBlock _autostartError;
 
-    public GeneralPage(SettingsContext ctx) : base(ctx, "Général", "L'emplacement de la configuration, le démarrage, le thème.")
+    public GeneralPage(SettingsContext ctx) : base(ctx, "Général", "Ce poste, l'apparence, les mises à jour.")
     {
         _cellsPath = new TextBox { Text = ctx.Store.CellsPath, IsReadOnly = true, Width = 460, HorizontalAlignment = HorizontalAlignment.Left };
-        var browse = Btn("Parcourir…", () =>
+        var browse = Bricks.Btn(this, "Parcourir…", () =>
         {
             var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "cells.json|*.json", FileName = ctx.Store.CellsPath, CheckFileExists = false };
             if (dialog.ShowDialog() != true) return;
@@ -26,69 +25,53 @@ public sealed class GeneralPage : PageBase
             ctx.Store.App.Save();
             _cellsPath.Text = dialog.FileName + "  (au prochain démarrage)";
         });
-        var openDir = Btn("Ouvrir le dossier", () => ActionRunner.Open(Path.GetDirectoryName(ctx.Store.CellsPath)!));
+        var openDir = Bricks.Btn(this, "Ouvrir le dossier", () => ActionRunner.Open(Path.GetDirectoryName(ctx.Store.CellsPath)!));
         var pathRow = new StackPanel { Orientation = Orientation.Horizontal };
         pathRow.Children.Add(_cellsPath); browse.Margin = new Thickness(8, 0, 8, 0); pathRow.Children.Add(browse); pathRow.Children.Add(openDir);
-        var hint = Ui.Text("Mets ce fichier dans un dossier synchronisé pour retrouver tes pilules sur une autre machine ; la position et l'écran restent propres à chaque poste.", 11, null, "Muted");
-        hint.TextWrapping = TextWrapping.Wrap;
+        var cellsHint = Bricks.Hint(this, "Mets ce fichier dans un dossier synchronisé pour retrouver tes pilules sur une autre machine ; la position et l'écran restent propres à chaque poste.");
 
         Body.Children.Add(Banner);
-        Body.Children.Add(Section("Configuration"));
-        Body.Children.Add(Card(Stack(Row("Fichier cells.json", pathRow), hint)));
+        Body.Children.Add(Bricks.Card(this, "Configuration", Bricks.Row("Fichier cells.json", pathRow), cellsHint));
 
+        // SetEnabled peut échouer (script introuvable, tâche verrouillée…) : la case reflète alors l'état réel, pas
+        // le clic. Bricks.Check s'accroche à Click (jamais déclenché par un changement d'IsChecked posé en code),
+        // donc reposer _autostart.IsChecked ici après un échec ne rappelle pas Commit en boucle.
+        _autostartError = Bricks.Hint(this, "");
         _autostartError.Visibility = Visibility.Collapsed;
-        _autostart.IsChecked = Autostart.IsEnabled();
-        // SetEnabled peut échouer (script introuvable, tâche verrouillée…) : la case reflète alors l'état réel,
-        // pas le clic — remise en place sans redéclencher Checked/Unchecked (sinon boucle infinie).
-        var revertingAutostart = false;
-        _autostart.Checked += (_, _) => OnAutostartToggled(true);
-        _autostart.Unchecked += (_, _) => OnAutostartToggled(false);
-        // schtasks / le script de l'installateur peuvent prendre quelques secondes : la case se grise le temps de
-        // l'opération plutôt que de figer la fenêtre, et reflète l'état réel à la fin.
+        CheckBox autostart = null!;
         void OnAutostartToggled(bool enabled)
         {
-            if (revertingAutostart) return;
-            _autostart.IsEnabled = false;
+            autostart.IsEnabled = false;
             _ = Task.Run(() => Autostart.SetEnabled(enabled)).ContinueWith(t => Dispatcher.BeginInvoke(() =>
             {
                 var ok = t.Status == TaskStatus.RanToCompletion && t.Result;
-                if (!ok)
-                {
-                    revertingAutostart = true;
-                    _autostart.IsChecked = Autostart.IsEnabled();
-                    revertingAutostart = false;
-                }
+                if (!ok) autostart.IsChecked = Autostart.IsEnabled();
+                _autostartError.Text = "Impossible de modifier le démarrage automatique.";
                 _autostartError.Visibility = ok ? Visibility.Collapsed : Visibility.Visible;
-                _autostart.IsEnabled = true;
+                autostart.IsEnabled = true;
             }));
         }
-        var theme = Combo(Themes, ctx.Store.App.GetString("appearance.theme", "system"), v =>
+        autostart = Bricks.Check(this, "Lancer customNotch à l'ouverture de session", Autostart.IsEnabled(), OnAutostartToggled);
+
+        var activity = Bricks.Combo(this, "Indicateur d'activité", Activities, ctx.Store.Current.Appearance.Activity, v => Try(() => ctx.Editor.SetAppearance(a => a["activity"] = v)));
+        var cardScale = Bricks.Slider(ctx.Store.Current.Appearance.CardScale, 1.0, 1.5, 0.05,
+            v => Try(() => ctx.Editor.SetAppearance(a => a["cardScale"] = Math.Round(v, 2))), v => $"{Math.Round(v * 100)} %", "cardScale");
+        var theme = Bricks.Combo(this, "Thème des fenêtres", Themes, ctx.Store.App.GetString("appearance.theme", "system"), v =>
         {
             ctx.Store.App.Set("appearance.theme", v);
             ctx.Store.App.Save();
             Theme.Apply(Application.Current, ctx.Store.App);
         });
+        Body.Children.Add(Bricks.Card(this, "Apparence", activity, Bricks.Row("Échelle de la carte", cardScale), theme));
 
-        var activity = Combo(Activities, ctx.Store.Current.Appearance.Activity, v => Try(() => ctx.Editor.SetAppearance(a => a["activity"] = v)));
-        var cardScale = Bricks.Slider(ctx.Store.Current.Appearance.CardScale, 1.0, 1.5, 0.05,
-            v => Try(() => ctx.Editor.SetAppearance(a => a["cardScale"] = Math.Round(v, 2))), v => $"{Math.Round(v * 100)} %", "cardScale");
-        Body.Children.Add(Section("Apparence"));
-        Body.Children.Add(Card(Stack(Row("Indicateur d'activité", activity), Row("Échelle de la carte", cardScale))));
+        Body.Children.Add(BuildUpdatesCard(ctx));
+        Body.Children.Add(BuildDiagnosticsCard());
+        Body.Children.Add(Bricks.Card(this, "Poste", autostart, _autostartError));
 
-        Body.Children.Add(Section("Mises à jour"));
-        Body.Children.Add(Card(BuildUpdatesCard(ctx)));
-
-        Body.Children.Add(Section("Journal et diagnostic"));
-        Body.Children.Add(Card(BuildDiagnosticsCard()));
-
-        Body.Children.Add(Section("Poste"));
-        Body.Children.Add(Card(Stack(Row("Démarrage", _autostart), _autostartError, Row("Thème des fenêtres", theme))));
-
-        var repo = Btn("Le dépôt sur GitHub", () => ActionRunner.Open("https://github.com/c-chares69/customNotch"), "GhostButton");
-        var about = new StackPanel { Orientation = Orientation.Horizontal };
-        about.Children.Add(repo);
-        Body.Children.Add(Section("À propos"));
-        Body.Children.Add(Card(Stack(Row($"customNotch {Core.App.Version}", about))));
+        var about = Bricks.Card(this, "À propos",
+            Bricks.Hint(this, $"customNotch {Core.App.Version}"),
+            Bricks.Action(this, "Le dépôt sur GitHub", () => ActionRunner.Open("https://github.com/c-chares69/customNotch")));
+        Body.Children.Add(about);
     }
 
     /// <summary>Vérification automatique, adresse du manifeste, cadence, et les trois actions (vérifier, installer,
@@ -98,29 +81,28 @@ public sealed class GeneralPage : PageBase
     private UIElement BuildUpdatesCard(SettingsContext ctx)
     {
         var updates = ctx.Updates;
-        var autoCheck = new CheckBox { Content = "Vérifier automatiquement", IsChecked = ctx.Store.App.GetBool("updates.enabled", true) };
-        autoCheck.Checked += (_, _) => { ctx.Store.App.Set("updates.enabled", true); ctx.Store.App.Save(); };
-        autoCheck.Unchecked += (_, _) => { ctx.Store.App.Set("updates.enabled", false); ctx.Store.App.Save(); };
-
-        var urlHint = Ui.Text($"Adresse par défaut : {Updates.DefaultManifestUrl}", 11, null, "Muted");
-        urlHint.TextWrapping = TextWrapping.Wrap;
-        var urlField = Debounced(ctx.Store.App.GetString("updates.url"), v =>
+        var autoCheck = Bricks.Check(this, "Vérifier automatiquement", ctx.Store.App.GetBool("updates.enabled", true), v =>
         {
-            ctx.Store.App.Set("updates.url", v.Trim());
+            ctx.Store.App.Set("updates.enabled", v);
             ctx.Store.App.Save();
-        }, 460);
-        void RefreshUrlHint() => urlHint.Visibility = urlField.Text.Trim().Length == 0 ? Visibility.Visible : Visibility.Collapsed;
-        RefreshUrlHint();
-        urlField.TextChanged += (_, _) => RefreshUrlHint();
+        });
 
-        var interval = Bricks.Slider(ctx.Store.App.GetDouble("updates.interval_hours", 24), 1, 720, 1,
-            v => { ctx.Store.App.Set("updates.interval_hours", Math.Round(v)); ctx.Store.App.Save(); }, v => $"{Math.Round(v)} h");
+        var url = Bricks.Text(this, "Adresse du manifeste", ctx.Store.App.GetString("updates.url"), v =>
+        {
+            ctx.Store.App.Set("updates.url", v);
+            ctx.Store.App.Save();
+        }, placeholder: $"Adresse par défaut : {Updates.DefaultManifestUrl}");
 
-        var status = Ui.Text(updates.Latest is { } pending ? $"{pending.Version} disponible." : "", 11, null, "Muted");
-        status.TextWrapping = TextWrapping.Wrap;
-        var install = Btn("Installer", () => { if (updates.Latest is { } r) updates.Prepare(r); });
+        var interval = Bricks.Number(this, "Toutes les", ctx.Store.App.GetDouble("updates.interval_hours", 24), 1, 720, v =>
+        {
+            ctx.Store.App.Set("updates.interval_hours", v);
+            ctx.Store.App.Save();
+        }, " h");
+
+        var status = Bricks.Hint(this, updates.Latest is { } pending ? $"{pending.Version} disponible." : "");
+        var install = Bricks.Action(this, "Installer", () => { if (updates.Latest is { } r) updates.Prepare(r); }, primary: true);
         Button skip = null!;
-        skip = Btn("Ignorer cette version", () =>
+        skip = Bricks.Action(this, "Ignorer cette version", () =>
         {
             if (updates.Latest is not { } r) return;
             updates.Skip(r.Version);
@@ -129,7 +111,7 @@ public sealed class GeneralPage : PageBase
             skip.Visibility = Visibility.Collapsed;
         });
         install.Visibility = skip.Visibility = updates.Latest is null ? Visibility.Collapsed : Visibility.Visible;
-        var check = Btn("Vérifier maintenant", () => { status.Text = "Vérification…"; updates.Check(manual: true); }, "Primary");
+        var check = Bricks.Action(this, "Vérifier maintenant", () => { status.Text = "Vérification…"; updates.Check(manual: true); });
 
         void OnUpToDate(string version) => Dispatcher.BeginInvoke(() =>
         {
@@ -157,17 +139,16 @@ public sealed class GeneralPage : PageBase
 
         var actions = new StackPanel { Orientation = Orientation.Horizontal };
         actions.Children.Add(check); actions.Children.Add(install); actions.Children.Add(skip);
-        return Stack(Row("Vérification", autoCheck), Row("Adresse du manifeste", urlField), urlHint, Row("Toutes les", interval), actions, status);
+        return Bricks.Card(this, "Mises à jour", autoCheck, url, interval, actions, status);
     }
 
     /// <summary>Le journal existant, et « Signaler un problème » qui dépose une archive de diagnostic (hors thread
     /// UI : <see cref="Diagnostics.MakeReport"/> lit et zippe plusieurs fichiers).</summary>
     private UIElement BuildDiagnosticsCard()
     {
-        var status = Ui.Text("", 11, null, "Muted");
-        status.TextWrapping = TextWrapping.Wrap;
-        var journal = Btn("Ouvrir le journal", () => { if (Log.Directory is { } d) ActionRunner.Open(d); });
-        var report = Btn("Signaler un problème…", () =>
+        var status = Bricks.Hint(this, "");
+        var journal = Bricks.Action(this, "Ouvrir le journal", () => { if (Log.Directory is { } d) ActionRunner.Open(d); });
+        var report = Bricks.Action(this, "Signaler un problème…", () =>
         {
             status.Text = "Rapport en cours…";
             Task.Run(() =>
@@ -179,17 +160,9 @@ public sealed class GeneralPage : PageBase
                     ? $"Rapport déposé sur le Bureau : {Path.GetFileName(path)}"
                     : "Rapport impossible à écrire."));
         });
-        var hint = Ui.Text("Erreurs de démarrage, écritures en attente : tout y passe. « Signaler un problème » dépose sur le Bureau une archive de diagnostic : journaux, configuration sans aucun secret, informations système - à joindre à ta demande d'aide.", 11, null, "Muted");
-        hint.TextWrapping = TextWrapping.Wrap;
+        var hint = Bricks.Hint(this, "Erreurs de démarrage, écritures en attente : tout y passe. « Signaler un problème » dépose sur le Bureau une archive de diagnostic : journaux, configuration sans aucun secret, informations système - à joindre à ta demande d'aide.");
         var actions = new StackPanel { Orientation = Orientation.Horizontal };
         actions.Children.Add(journal); actions.Children.Add(report);
-        return Stack(actions, status, hint);
-    }
-
-    private static StackPanel Stack(params UIElement[] children)
-    {
-        var s = new StackPanel();
-        foreach (var c in children) s.Children.Add(c);
-        return s;
+        return Bricks.Card(this, "Journal et diagnostic", actions, status, hint);
     }
 }

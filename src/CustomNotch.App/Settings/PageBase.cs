@@ -7,9 +7,9 @@ namespace CustomNotch.App.Settings;
 /// <summary>Une page : un corps vertical de cartes (Body), sans en-tête ni défilement propres — la coquille
 /// (SettingsWindow) les dessine désormais, comme HubWindow.xaml dessine PageTitle/PageSubtitle/PageScroll une
 /// seule fois pour toutes les pages plutôt que chacune la sienne. Title/Subtitle restent portés par la page (posés
-/// une fois au constructeur) : la fenêtre les lit à chaque bascule de page (Show(key)). Les briques communes
-/// (section, carte, ligne de formulaire, combo, champ à anti-rebond, bouton) sont dans Bricks, partagées avec les
-/// éditeurs ; ici, de simples forwarders pour que les pages existantes appellent Section(...) sans préfixe.</summary>
+/// une fois au constructeur) : la fenêtre les lit à chaque bascule de page (Show(key)). Les briques (carte, ligne
+/// de formulaire, combo, champ, bouton…) sont dans Bricks, partagées avec les éditeurs (PillEditor, CellEditor) qui
+/// ne sont pas des pages ; chaque page les appelle directement (Bricks.Card(this, …), Bricks.Row(…)…).</summary>
 public abstract class PageBase : UserControl
 {
     protected readonly StackPanel Body = new();
@@ -64,18 +64,4 @@ public abstract class PageBase : UserControl
         catch (ConfigException ex) { Banner.Show(ex.Message); }
     }
 
-    /// <summary>Briques déléguées à Bricks (partagées avec les éditeurs, qui ne sont pas des pages) : mêmes
-    /// signatures et mêmes valeurs par défaut qu'avant l'extraction, pour que les pages existantes n'aient rien à
-    /// changer avant leur recomposition (Task 2).</summary>
-    protected static TextBlock Section(string text) => Bricks.Section(text);
-
-    protected static Border Card(UIElement content) => Bricks.Card(content);
-
-    protected static Grid Row(string label, UIElement field, double labelWidth = 220) => Bricks.Row(label, field, labelWidth);
-
-    protected static ComboBox Combo(IReadOnlyList<(string Value, string Label)> items, string? current, Action<string> onChange) => Bricks.Combo(items, current, onChange);
-
-    protected static TextBox Debounced(string initial, Action<string> onChange, double width = 360) => Bricks.Debounced(initial, onChange, width);
-
-    protected static Button Btn(string text, Action click, string style = "Secondary") => Bricks.Btn(text, click, style);
 }

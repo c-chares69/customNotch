@@ -2,14 +2,18 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Threading;
+using System.Windows.Input;
+using System.Windows.Media;
 using CustomNotch.Core.Sources;
 
 namespace CustomNotch.App.Settings;
 
 /// <summary>Le formulaire d'une source, construit depuis son schéma : une rangée par champ, groupées par section. Un
 /// champ « secret » n'affiche jamais sa valeur ; il dit « défini » et sait s'effacer. La page décide où chaque
-/// changement va (params ou secrets.json) : le formulaire ne fait que rappeler.</summary>
+/// changement va (params ou secrets.json) : le formulaire ne fait que rappeler. Rendu avec les briques (ligne de
+/// formulaire, champ stylé « Field », message d'erreur « Problem ») sans porter de <see cref="FrameworkElement"/>
+/// hôte propre : Build garde ses quatre paramètres (SchemaFormTests, CellEditor l'appellent déjà comme ça) et pose
+/// les styles par <c>SetResourceReference</c> — comme <see cref="Ui"/> — plutôt que par <c>host.FindResource</c>.</summary>
 public static class SchemaForm
 {
     public enum Kind { Text, Number, Check, Choice, Path, Url, Secret }
@@ -77,6 +81,7 @@ public static class SchemaForm
         {
             case Kind.Check:
                 var check = new CheckBox { IsChecked = InitialText(field, parameters) == "true", VerticalAlignment = VerticalAlignment.Center };
+                check.SetResourceReference(System.Windows.Controls.Control.ForegroundProperty, "Fg");
                 check.Checked += (_, _) => onChange(field.Name, JsonValue.Create(true));
                 check.Unchecked += (_, _) => onChange(field.Name, JsonValue.Create(false));
                 return check;
@@ -100,45 +105,53 @@ public static class SchemaForm
                 return panel;
             case Kind.Path:
                 var pathPanel = new StackPanel { Orientation = Orientation.Horizontal };
-                var pathBox = Text(field, parameters, s => onChange(field.Name, s.Length == 0 ? null : JsonValue.Create(s)));
-                var browse = new Button { Content = "…", Margin = new Thickness(6, 0, 0, 0), MinWidth = 32 }; browse.SetResourceReference(FrameworkElement.StyleProperty, "Secondary");
-                browse.Click += (_, _) => { var d = new Microsoft.Win32.OpenFileDialog { CheckFileExists = false }; if (d.ShowDialog() == true) pathBox.Text = d.FileName; };
-                pathPanel.Children.Add(pathBox); pathPanel.Children.Add(browse);
+                var pathField = Text(field, parameters, s => onChange(field.Name, s.Length == 0 ? null : JsonValue.Create(s)));
+                var browse = new Button { Content = "…", Margin = new Thickness(6, 0, 0, 0), MinWidth = 32, VerticalAlignment = VerticalAlignment.Top }; browse.SetResourceReference(FrameworkElement.StyleProperty, "Secondary");
+                browse.Click += (_, _) => { var d = new Microsoft.Win32.OpenFileDialog { CheckFileExists = false }; if (d.ShowDialog() == true) pathField.Box.Text = d.FileName; };
+                pathPanel.Children.Add(pathField.Panel); pathPanel.Children.Add(browse);
                 return pathPanel;
             case Kind.Number:
                 return Text(field, parameters, s =>
                 {
                     if (s.Trim().Length == 0) { onChange(field.Name, null); return; }
                     if (ParseNumber(s) is { } n) onChange(field.Name, JsonValue.Create(n));
-                });
+                }).Panel;
             default:
-                return Text(field, parameters, s => onChange(field.Name, s.Length == 0 ? null : JsonValue.Create(s)));
+                return Text(field, parameters, s => onChange(field.Name, s.Length == 0 ? null : JsonValue.Create(s))).Panel;
         }
     }
 
-    /// <summary>Un champ texte à anti-rebond (300 ms) ; rouge tant qu'un nombre attendu n'en est pas un. Au démontage,
-    /// une valeur en attente est validée tout de suite plutôt que perdue ou écrite à l'aveugle après coup sur un
-    /// éditeur qui n'existe plus. Nommé d'après le champ (x:Name) : PillsPage.ShowEditor() s'en sert pour retrouver
-    /// ce même contrôle dans l'éditeur reconstruit après une écriture et y rendre le focus.</summary>
-    private static TextBox Text(SchemaField field, JsonObject? parameters, Action<string> commit)
+    /// <summary>Un champ texte stylé « Field », qui commit à l'Entrée ou à la perte du focus (pas d'anti-rebond,
+    /// comme <see cref="Bricks.Text"/>) — accompagné de son message d'erreur « Problem », affiché tant qu'un
+    /// nombre attendu n'en est pas un. Nommé d'après le champ (x:Name) : PillsPage.ShowEditor() s'en sert pour
+    /// retrouver ce même contrôle dans l'éditeur reconstruit après une écriture et y rendre le focus.</summary>
+    private static (StackPanel Panel, TextBox Box) Text(SchemaField field, JsonObject? parameters, Action<string> commit)
     {
         var box = new TextBox { Text = InitialText(field, parameters), Width = 340, HorizontalAlignment = HorizontalAlignment.Left, Name = FieldName(field) };
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
-        var last = box.Text;
-        void Flush()
+        box.SetResourceReference(System.Windows.Controls.Control.StyleProperty, "Field");
+        var problem = new TextBlock { Margin = new Thickness(2, 4, 0, 0), Visibility = Visibility.Collapsed };
+        problem.SetResourceReference(TextBlock.StyleProperty, "Hint");
+        problem.SetResourceReference(TextBlock.ForegroundProperty, "Warn");
+        var current = box.Text;
+        void Commit()
         {
-            timer.Stop();
-            if (box.Text == last) return;
-            last = box.Text;
-            if (ControlKind(field) == Kind.Number && box.Text.Trim().Length > 0 && ParseNumber(box.Text) is null) { box.SetResourceReference(System.Windows.Controls.Control.BorderBrushProperty, "Danger"); return; }
-            box.SetResourceReference(System.Windows.Controls.Control.BorderBrushProperty, "Border");
+            if (box.Text == current) return;
+            if (ControlKind(field) == Kind.Number && box.Text.Trim().Length > 0 && ParseNumber(box.Text) is null)
+            {
+                problem.Text = $"« {box.Text.Trim()} » n'est pas un nombre.";
+                problem.Visibility = Visibility.Visible;
+                return;
+            }
+            problem.Visibility = Visibility.Collapsed;
+            current = box.Text;
             commit(box.Text);
         }
-        timer.Tick += (_, _) => Flush();
-        box.TextChanged += (_, _) => { timer.Stop(); timer.Start(); };
-        box.LostFocus += (_, _) => Flush();
-        box.Unloaded += (_, _) => { if (timer.IsEnabled) Flush(); };
-        return box;
+        box.LostFocus += (_, _) => Commit();
+        box.KeyDown += (_, e) => { if (e.Key == Key.Enter) Commit(); };
+        var panel = new StackPanel();
+        panel.Children.Add(box);
+        panel.Children.Add(problem);
+        return (panel, box);
     }
 
     /// <summary>« param_ » + le nom du champ, assaini en nom WPF valide (lettres, chiffres, tiret bas) — un nom de

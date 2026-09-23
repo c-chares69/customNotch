@@ -13,45 +13,12 @@ namespace CustomNotch.App.Settings;
 /// de <c>SettingsPages</c> (ClickUp-Extended), statiques ici (pas d'instance de page à porter) donc chaque brique
 /// reçoit son <see cref="FrameworkElement"/> hôte pour <c>FindResource</c>, exactement comme <c>_host</c> là-bas.
 /// Un éditeur n'est pas une page (il n'a ni en-tête ni défilement propre), donc ces briques vivent ici plutôt que
-/// dans PageBase — les deux les appellent.
-///
-/// Les membres qui suivent la signature d'origine (Section, Card(content), Row(label,field,labelWidth), Combo sans
-/// hôte, Debounced, Btn) restent tels quels : les pages non encore recomposées (Task 2) les appellent encore, et
-/// rien ne doit changer sous elles avant leur tour.</summary>
+/// dans PageBase — les deux les appellent.</summary>
 internal static class Bricks
 {
-    // ------------------------------------------------------------------ briques d'origine (compatibilité, Task 2 les retire)
-
-    public static TextBlock Section(string text)
-    {
-        var t = Ui.Text(text.ToUpperInvariant(), 11, FontWeights.SemiBold, "Muted");
-        t.Margin = new Thickness(0, 18, 0, 6);
-        return t;
-    }
-
-    public static Border Card(UIElement content)
-    {
-        var card = new Border { Child = content, CornerRadius = new CornerRadius(10), Padding = new Thickness(16, 10, 16, 10), BorderThickness = new Thickness(1) };
-        card.SetResourceReference(Border.BackgroundProperty, "Surface");
-        card.SetResourceReference(Border.BorderBrushProperty, "Border");
-        return card;
-    }
-
     /// <summary>La ligne de formulaire de base : libellé dans une colonne fixe, champ borné à 640 px et calé à
-    /// gauche. <paramref name="labelWidth"/> défaut à 240 (le gabarit SettingsPages, Ui.FormRow) ; toutes les pages
-    /// d'avant Task 2 passent leur propre largeur via leur wrapper local (PageBase.Row, CellEditor.Row…), donc ce
-    /// changement de défaut ne change rien sous elles.</summary>
+    /// gauche — le gabarit SettingsPages (Ui.FormRow).</summary>
     public static Grid Row(string label, UIElement field, double labelWidth = 240) => Ui.FormRow(Ui.FormLabel(label), field, labelWidth);
-
-    /// <summary>Une liste déroulante valeur/libellé qui rappelle onChange avec la valeur choisie.</summary>
-    public static ComboBox Combo(IReadOnlyList<(string Value, string Label)> items, string? current, Action<string> onChange, double minWidth = 220)
-    {
-        var combo = new ComboBox { MinWidth = minWidth, HorizontalAlignment = HorizontalAlignment.Left };
-        foreach (var (value, label) in items) combo.Items.Add(new ComboBoxItem { Content = label, Tag = value });
-        combo.SelectedIndex = Math.Max(0, items.ToList().FindIndex(i => i.Value == current));
-        combo.SelectionChanged += (_, _) => { if (combo.SelectedItem is ComboBoxItem it && it.Tag is string v) onChange(v); };
-        return combo;
-    }
 
     /// <summary>Un champ texte qui rappelle onChange 300 ms après la dernière frappe (et à la perte du focus). Au
     /// démontage, une valeur en attente est validée tout de suite plutôt que perdue ou écrite à l'aveugle après coup
@@ -69,14 +36,6 @@ internal static class Bricks
         box.LostFocus += (_, _) => Flush();
         box.Unloaded += (_, _) => { if (timer.IsEnabled) Flush(); };
         return box;
-    }
-
-    public static Button Btn(string text, Action click, string style = "Secondary", double rightMargin = 8)
-    {
-        var b = new Button { Content = text, Margin = new Thickness(0, 0, rightMargin, 0) };
-        b.SetResourceReference(FrameworkElement.StyleProperty, style);
-        b.Click += (_, _) => click();
-        return b;
     }
 
     /// <summary>Un curseur qui n'écrit qu'au relâchement (ou 300 ms après un changement au clavier) : pas une écriture par
@@ -106,6 +65,32 @@ internal static class Bricks
     }
 
     // ------------------------------------------------------------------ briques façon SettingsPages (ClickUp-Extended)
+
+    /// <summary>Un bouton discret (Secondary ou GhostButton) qui n'entre dans aucune ligne de formulaire — barre
+    /// d'outils de l'arbre pilules/cellules, boutons ↑/↓/✕ d'une liste. <see cref="Action"/> est réservé aux boutons
+    /// d'action « pleins » (Primary/Secondary, dans une carte) ; celui-ci garde le style et la marge compacte d'un
+    /// bouton d'outils.</summary>
+    public static Button Btn(FrameworkElement host, string text, Action click, string style = "Secondary", double rightMargin = 8)
+    {
+        var b = new Button { Content = text, Margin = new Thickness(0, 0, rightMargin, 0), Style = (Style)host.FindResource(style) };
+        b.Click += (_, _) => click();
+        return b;
+    }
+
+    /// <summary>Un champ texte nu (sans libellé ni ligne de formulaire) qui commit à l'Entrée ou à la perte du
+    /// focus — pour composer une ligne à plusieurs champs (seuils avertir/critique, valeur d'une action de carte…).
+    /// Comme <see cref="Text"/>, pas d'anti-rebond : la frappe s'applique à la validation, pas à chaque touche.
+    /// <paramref name="name"/> (facultatif) pose x:Name pour le focus restauré par PillsPage.ShowEditor().</summary>
+    public static TextBox Field(FrameworkElement host, string value, Action<string> commit, double width = 90, string? name = null)
+    {
+        var box = new TextBox { Text = value, Width = width, Padding = new Thickness(8, 6, 8, 6), Style = (Style)host.FindResource("Field"), HorizontalAlignment = HorizontalAlignment.Left };
+        if (name is { Length: > 0 }) box.Name = name;
+        var current = value;
+        void Commit() { var v = box.Text.Trim(); if (v == current) return; current = v; commit(v); }
+        box.LostKeyboardFocus += (_, _) => Commit();
+        box.KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) Commit(); };
+        return box;
+    }
 
     /// <summary>Une indication sous un champ ou en fin de carte, style Hint.</summary>
     public static TextBlock Hint(FrameworkElement host, string text) => new() { Text = text, Style = (Style)host.FindResource("Hint") };
