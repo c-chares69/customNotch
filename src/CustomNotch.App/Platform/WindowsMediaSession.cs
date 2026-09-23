@@ -16,6 +16,7 @@ public sealed class WindowsMediaSession : IMediaSession, IDisposable
     private MediaState? _state;
     private TypedEventHandler<GlobalSystemMediaTransportControlsSession, MediaPropertiesChangedEventArgs>? _onProps;
     private TypedEventHandler<GlobalSystemMediaTransportControlsSession, PlaybackInfoChangedEventArgs>? _onPlayback;
+    private TypedEventHandler<GlobalSystemMediaTransportControlsSession, TimelinePropertiesChangedEventArgs>? _onTimeline;
     private TypedEventHandler<GlobalSystemMediaTransportControlsSessionManager, CurrentSessionChangedEventArgs>? _onSession;
     /// <summary>Dispose() peut s'exécuter pendant que InitAsync() attend RequestAsync() : sans ce drapeau, la
     /// continuation se rattache un gestionnaire et une session comme si de rien n'était, et l'objet se « redispose ».</summary>
@@ -56,14 +57,17 @@ public sealed class WindowsMediaSession : IMediaSession, IDisposable
             {
                 if (_onProps is not null) _session.MediaPropertiesChanged -= _onProps;
                 if (_onPlayback is not null) _session.PlaybackInfoChanged -= _onPlayback;
+                if (_onTimeline is not null) _session.TimelinePropertiesChanged -= _onTimeline;
             }
             _session = session;
             if (session is not null)
             {
                 _onProps = (_, _) => _ = RefreshAsync();
                 _onPlayback = (_, _) => _ = RefreshAsync();
+                _onTimeline = (_, _) => _ = RefreshAsync();
                 session.MediaPropertiesChanged += _onProps;
                 session.PlaybackInfoChanged += _onPlayback;
+                session.TimelinePropertiesChanged += _onTimeline;
             }
         }
         _ = RefreshAsync();
@@ -84,13 +88,28 @@ public sealed class WindowsMediaSession : IMediaSession, IDisposable
             // l'interface, qui met en cache l'image décodée par référence, ne la redécode pas à chaque bascule.
             var previous = Current()?.Cover;
             if (cover is not null && previous is not null && previous.AsSpan().SequenceEqual(cover)) cover = previous;
-            Set(title.Length == 0 ? null : new MediaState(title, props?.Artist ?? "", AppName(session.SourceAppUserModelId), playing, cover));
+            var (posMs, durMs, atMs) = ReadTimeline(session);
+            Set(title.Length == 0
+                ? null
+                : new MediaState(title, props?.Artist ?? "", AppName(session.SourceAppUserModelId), playing, cover, posMs, durMs, atMs));
         }
         catch (Exception ex)
         {
             Log.Warning("media", $"Lecture de la session média : {ex.Message}");
             Set(null);
         }
+    }
+
+    /// <summary>Position, durée et horodatage de la mesure (époque, ms), ou trois null si la session ne publie pas de
+    /// durée exploitable (DurationMs &lt;= 0 — flux en direct, ou application qui ne renseigne rien). Spotify et la
+    /// plupart des applications ne republient la timeline que toutes les quelques secondes : l'avance à la seconde
+    /// entre deux publications est reconstituée par la carte à partir de PositionAtMs, pas ici.</summary>
+    private static (long? Position, long? Duration, long? At) ReadTimeline(GlobalSystemMediaTransportControlsSession session)
+    {
+        var tl = session.GetTimelineProperties();
+        var duration = (long)(tl.EndTime - tl.StartTime).TotalMilliseconds;
+        if (duration <= 0) return (null, null, null);
+        return ((long)tl.Position.TotalMilliseconds, duration, tl.LastUpdatedTime.ToUnixTimeMilliseconds());
     }
 
     /// <summary>La vignette (pochette) de la session, telle quelle : les applications donnent du PNG ou du JPEG de
