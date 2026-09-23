@@ -41,12 +41,17 @@ public sealed class ClaudeSource : SourceBase
         sessions.IgnoredPids = () => renewal.LaunchedPids;
         // Une session qui change d'état (busy → waiting, terminée…) doit se voir tout de suite, hors cadence -
         // même patron que MediaSource : pousser toutes les cellules claude connues.
-        sessions.Changed += () =>
-        {
-            string[] ids;
-            lock (_lock) ids = _cells.ToArray();
-            foreach (var id in ids) Push(id);
-        };
+        sessions.Changed += RefreshAll;
+    }
+
+    /// <summary>Pousse toutes les cellules <c>claude</c> connues hors cadence - la page Réglages (« Relire
+    /// maintenant ») n'a pas de cellule à elle pour appeler <see cref="InvokeAsync"/>, contrairement à un clic
+    /// sur la carte d'une pilule.</summary>
+    public void RefreshAll()
+    {
+        string[] ids;
+        lock (_lock) ids = _cells.ToArray();
+        foreach (var id in ids) Push(id);
     }
 
     /// <summary>Posée par l'App (<c>ClaudeCli.SignIn</c>) : ouvre un terminal visible sur <c>claude auth

@@ -7,7 +7,7 @@ namespace CustomNotch.App.Settings;
 /// contrôleur ; chaque page applique ses changements immédiatement (pas de bouton Enregistrer, comme dans les autres apps).</summary>
 public sealed class SettingsWindow : Window
 {
-    public static readonly (string Key, string Label)[] Nav = { ("pills", "Pilules & cellules"), ("sources", "Sources"), ("general", "Général") };
+    public static readonly (string Key, string Label)[] Nav = { ("pills", "Pilules & cellules"), ("sources", "Sources"), ("claude", "Claude"), ("general", "Général") };
 
     private readonly ListBox _nav = new();
     private readonly ContentControl _host = new();
@@ -24,6 +24,7 @@ public sealed class SettingsWindow : Window
 
         _pages["pills"] = new PillsPage(ctx);
         _pages["sources"] = new SourcesPage(ctx);
+        _pages["claude"] = new ClaudePage(ctx);
         _pages["general"] = new GeneralPage(ctx);
 
         var side = new Grid { Width = 220 };

@@ -29,7 +29,7 @@ Il est produit par `scripts\package.ps1` avec [Inno Setup 6](https://jrsoftware.
   « Quitter » volontaire) ;
 - arrête l'application en cours avant de remplacer ses fichiers, la relance à la fin ;
 - silencieux avec `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART` : c'est ainsi que la mise à jour
-  automatique la lancera, une fois le lecteur de manifeste écrit (plan 3).
+  automatique la lancera, une fois le lecteur de manifeste écrit (0.3.1).
 
 ```powershell
 winget install Microsoft.DotNet.SDK.10                          # une fois
@@ -81,7 +81,7 @@ Sans certificat, la publication réussit et le dit : « non signé ».
 Le manifeste `latest.json` (version, URL, empreinte SHA-256, notes) est produit par
 `scripts\package.ps1` et publié dès maintenant avec le setup et l'archive. La vérification
 *dans l'application* (*Réglages → Général → Mises à jour*), le téléchargement et
-l'installation silencieuse arrivent au plan 3 ; en attendant, une nouvelle version se pose à
+l'installation silencieuse arrivent en 0.3.1 ; en attendant, une nouvelle version se pose à
 la main, depuis les releases GitHub.
 
 Publier une version : `scripts\package.ps1` puis `scripts\release.ps1`, qui crée la release
@@ -97,8 +97,8 @@ En développement, `dotnet run --project src/CustomNotch.App` suffit.
 
 Tout se règle dans **Réglages…** (icône du tray, ou clic droit sur une pilule). Au premier
 lancement, customNotch écrit un `cells.json` par défaut dans `%APPDATA%\customNotch\` (une
-pilule à droite : le groupe Système, ce qui joue, un lanceur ClickUp). Trois fichiers, trois
-rôles — c'est ce que Réglages écrit :
+pilule à droite : Claude Code, le groupe Système, ce qui joue, un lanceur ClickUp). Trois
+fichiers, trois rôles — c'est ce que Réglages écrit :
 
 | Fichier | Contenu | Synchronisable |
 |---|---|---|
@@ -139,6 +139,21 @@ ou une cellule.
 
 Exemple complet, commenté champ par champ (deux pilules, un groupe, un exemple `http` en
 commentaire) : [docs/cells.example.json](docs/cells.example.json).
+
+### Claude Code
+
+La cellule `claude` (posée par défaut) montre, en anneau, la fenêtre de session (5 h) ; sa carte
+liste toutes les fenêtres de limite avec leur reset, la répartition hebdomadaire par surface, et
+les sessions Claude Code en cours (occupée / en attente / inactive / terminée). Le jeton vient de
+`~/.claude/.credentials.json` (lecture seule, jamais journalisé) et se renouvelle tout seul avant
+d'expirer (`claude -p`, fenêtre cachée) ; sans jeton valide, la cellule dit « Connexion requise ».
+
+**Réglages → Claude** réunit tout ce qu'il y a à savoir sans jamais montrer le jeton lui-même :
+compte (abonnement, palier), jeton (« valide jusqu'à … » / « expiré »), le CLI trouvé ou non
+(`winget install Anthropic.ClaudeCode` sinon), dernière lecture, prochain essai après une limite
+atteinte, sessions en cours, et le dossier `.claude` à utiliser (utile avec un autre compte).
+Le bouton **Se connecter** ouvre un terminal sur `claude auth login --claudeai` ; **Relire
+maintenant** relit tout de suite, sans attendre la prochaine cadence (5 min).
 
 ## Sources disponibles
 

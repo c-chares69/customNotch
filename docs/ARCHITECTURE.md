@@ -5,11 +5,14 @@ d'un coup d'œil une source — CPU, mémoire, batterie, une commande, un point 
 ce qui joue… — et dont le survol ouvre une carte de détail avec des actions. Troisième app de
 la famille ClickUp-Extended / AutoSort, dont elle reprend le stack, les briques (`Theme`, `Ui`,
 `Glyphs`, `Json`, `Log`, `Secrets`) et le patron de livraison (Inno Setup, tâches planifiées,
-manifeste de mise à jour). Ce document décrit l'architecture livrée par les plans 1 et 2 (le
-socle, puis la fenêtre Réglages, la source média, le groupe Système par défaut et la livraison) ;
-le code du dépôt l'implémente. La conception détaillée et les décisions sont dans
-`docs/superpowers/specs/2026-09-22-customnotch-design.md` (plan 1) et
-`docs/superpowers/specs/2026-09-23-customnotch-settings-media-design.md` (plan 2).
+manifeste de mise à jour). Ce document décrit l'architecture livrée par les versions 0.1.0 à
+0.3.0 (le socle, la fenêtre Réglages, la source média, le groupe Système par défaut, la
+livraison, puis la source `claude` et sa page Réglages) ; le code du dépôt l'implémente. La
+conception détaillée et les décisions sont dans
+`docs/superpowers/specs/2026-09-22-customnotch-design.md` (le socle),
+`docs/superpowers/specs/2026-09-23-customnotch-settings-media-design.md` (Réglages, média) et
+`docs/superpowers/specs/2026-09-23-customnotch-claude-design.md` (0.3.0 : jeton, usage,
+sessions, page Claude).
 
 ---
 
@@ -26,7 +29,6 @@ le code du dépôt l'implémente. La conception détaillée et les décisions so
 | Configuration | Trois fichiers : `cells.json` (portable), `cells.<machine>.json` (surcharge locale), `secrets.json` | Ce que l'utilisateur règle est synchronisable ; ce que l'app décide seule (position, écran) et les secrets ne le sont jamais. |
 | Instance unique | Port TCP local dérivé du dossier de données (`SingleInstance`) | Même mécanisme que ClickUp-Extended ; une seconde copie lancée à la main réveille la première, qui ouvre ses réglages. |
 | Tests | xUnit (`tests/CustomNotch.Core.Tests`, `tests/CustomNotch.App.Tests`) | `Core` est sans interface : tout se teste sans écran. `App` expose ses calculs de rendu (forme, placement, contenu de carte, `SchemaForm`) en fonctions pures, testées sans fenêtre. |
-| Hook Claude Code | `CustomNotch.Hook.exe` (console, sans dépendance) | Placeholder (`return 0;`) ; le contrat (`HttpListener` local, port 48667) est posé par la spec du socle et reste à remplir au plan 3. |
 
 ---
 
@@ -70,6 +72,17 @@ customNotch/
 │   │   │   ├── ShellSource.cs         # une commande (cmd.exe /c), sa sortie lue comme nombre, JSON ou texte
 │   │   │   ├── LauncherSource.cs      # pas de donnée : un glyph et une action « open »
 │   │   │   ├── JsonPath.cs            # « data.items[0].n » : le strict nécessaire pour pointer une valeur dans un JSON
+│   │   │   ├── Claude/
+│   │   │   │   ├── ClaudeCredentials.cs # .credentials.json (lecture seule), jeton masqué au journal
+│   │   │   │   ├── UsageModel.cs      # LimitWindow, UsageBreakdown, UsageSnapshot
+│   │   │   │   ├── UsageParser.cs     # limits[]/five_hour/seven_day → fenêtres dédoublonnées, libellés français
+│   │   │   │   ├── UsageClient.cs     # GET oauth/usage, UsageException typée (RateLimited/Unauthorized/NoLimits/Network)
+│   │   │   │   ├── Backoff.cs         # attente après 429, doublée, plafonnée, persistée (claude-backoff.json)
+│   │   │   │   ├── TokenRenewal.cs    # claude -p, marge 4 min, un essai par jeton, cooldown doublé
+│   │   │   │   ├── SessionRecord.cs   # un fichier ~/.claude/sessions/<pid>.json, parse tolérant
+│   │   │   │   ├── SessionRegistry.cs # vivacité par pid + heure de démarrage, sessions terminées gardées 10 min
+│   │   │   │   ├── ClaudeSource.cs    # type claude : assemble jeton, usage et sessions en une seule Reading
+│   │   │   │   └── ClaudeStatus.cs    # l'instantané pour la page Réglages → Claude
 │   │   │   ├── Media/
 │   │   │   │   ├── IMediaSession.cs   # le contrat côté cœur : MediaState (Title, Artist, App, Playing), Toggle/Next/PreviousAsync, Changed
 │   │   │   │   └── MediaSource.cs     # type media : titre — artiste, Busy en lecture, actions prev/toggle/next, Off sans session
@@ -126,10 +139,12 @@ customNotch/
 │   │   │   ├── GlyphGallery.cs        # la galerie des glyphes nommés + champ « tracé SVG »
 │   │   │   ├── EditorBanner.cs        # bandeau rouge en tête de l'éditeur quand ConfigEditor refuse ; la valeur reste dans le champ
 │   │   │   ├── SourcesPage.cs         # réglages globaux par type de source (aucun dans cette version) et liste des secrets
+│   │   │   ├── ClaudePage.cs          # compte, jeton, dernière lecture, sessions ; boutons Se connecter / Relire maintenant
 │   │   │   ├── GeneralPage.cs         # emplacement de cells.json, démarrage automatique, thème, journal, lien vers le dépôt
 │   │   │   └── Bricks.cs              # briques de formulaire communes aux pages (Section, Card, Row, Combo, Btn…)
 │   │   ├── Platform/
-│   │   │   └── WindowsMediaSession.cs # IMediaSession pour Windows : GlobalSystemMediaTransportControlsSessionManager (WinRT)
+│   │   │   ├── WindowsMediaSession.cs # IMediaSession pour Windows : GlobalSystemMediaTransportControlsSessionManager (WinRT)
+│   │   │   └── ClaudeCli.cs           # trouve/lance le CLI claude (caché pour le renouvellement, visible pour la connexion), heure de démarrage d'un processus
 │   │   └── Shared/                    # repris de ClickUp-Extended / AutoSort, non modifiés
 │   │       ├── Controls.xaml          # copie de ClickUp-Extended : styles WPF des contrôles de formulaire (champs, combos, cases)
 │   │       ├── Glyphs.cs              # les icônes tracées des boutons (lecture, pause, coche, crayon…)
@@ -138,9 +153,6 @@ customNotch/
 │   │       ├── Theme.cs               # palettes claire/sombre, accent système, chrome de fenêtre sombre
 │   │       ├── TrayMenuRenderer.cs    # le menu du tray (WinForms) peint avec la palette : le rendu Windows est toujours clair
 │   │       └── Ui.cs                  # les briques communes : pastille, bouton, ligne de formulaire — utilisées par Settings
-│   └── CustomNotch.Hook/
-│       ├── CustomNotch.Hook.csproj    # console minimale, net10.0, InvariantGlobalization : doit démarrer en moins de 100 ms
-│       └── Program.cs                 # placeholder (`return 0;`) : le client des hooks Claude Code vient au plan 3
 ├── tests/
 │   ├── CustomNotch.Core.Tests/        # xUnit : configuration, édition, validation, modèle, sources, média, chemins — tout sans écran
 │   └── CustomNotch.App.Tests/         # xUnit : les fonctions pures de rendu (forme, placement, glyphes, contenu de carte, SchemaForm)
@@ -386,18 +398,37 @@ succès) et rend une lecture périmée ; `Unauthorized` relit le fichier une foi
 retente l'appel), sinon « Connexion requise » ; `NoLimits` → texte « Aucune limite rapportée »,
 `Status.Off` (un état, pas une panne : pas périmée) ; `Network` → dernière lecture périmée avec le
 message de l'exception. `InvokeAsync("refresh")` pousse la cellule ; `("sign-in")` appelle le
-délégué `SignIn` (posé par l'App, plan 4 — absent, l'action ne fait rien). Le constructeur câble
-`sessions.IgnoredPids = () => renewal.LaunchedPids` et pousse, sur `sessions.Changed`, toutes les
-cellules `claude` connues — même patron que `MediaSource`. `Status` (propriété, type
-`ClaudeStatus` : jeton, dernier instantané d'usage — jamais effacé par une erreur passagère —,
-dernière erreur, prochain essai, chemin du CLI, sessions, dernier renouvellement) et l'événement
-`StatusChanged` alimentent la page Réglages → Claude (plan 4) sans qu'elle relise un fichier ou
-refasse un appel réseau. `CoreSources.Build(media, claude)` enregistre l'instance fournie par
-l'App ; `null` (avant le câblage du plan 4, ou dans les tests de configuration) retombe sur une
-instance interne sans délégué réel (CLI introuvable, aucun pid jamais vivant) — le type `claude`
-reste connu de la validation et du catalogue, sa lecture n'est simplement jamais sollicitée tant
-que le contrôleur n'en construit pas une vraie. `DefaultCells` pose la cellule `claude` en tête de
-la pilule par défaut, avant le groupe Système.
+délégué `SignIn` (posé par le `Controller`, ci-dessous). `RefreshAll()` pousse toutes les cellules
+`claude` connues à la demande — c'est ce que la page Réglages appelle pour « Relire maintenant »,
+qui n'a pas de cellule à elle pour passer par `InvokeAsync`. Le constructeur câble
+`sessions.IgnoredPids = () => renewal.LaunchedPids` et pousse, sur `sessions.Changed`,
+`RefreshAll()` — même patron que `MediaSource`. `Status` (propriété, type `ClaudeStatus` : jeton,
+dernier instantané d'usage — jamais effacé par une erreur passagère —, dernière erreur, prochain
+essai, chemin du CLI, sessions, dernier renouvellement) et l'événement `StatusChanged` alimentent
+la page Réglages → Claude (`ClaudePage`, §7) sans qu'elle relise un fichier ou refasse un appel
+réseau, et jamais le jeton lui-même. `CoreSources.Build(media, claude)` enregistre l'instance
+fournie par le `Controller` (`ClaudeCli` : CLI trouvé et lancé, heure de démarrage d'un processus,
+§ App ci-dessous) ; `null` (tests de configuration, catalogue de schémas) retombe sur une instance
+interne sans délégué réel (CLI introuvable, aucun pid jamais vivant, aucun fichier ni requête) —
+le type `claude` reste connu de la validation et du formulaire de la fenêtre Réglages, sa lecture
+n'est simplement jamais sollicitée. `DefaultCells` pose la cellule `claude` en tête de la pilule
+par défaut, avant le groupe Système.
+
+`ClaudeCli` (`App/Platform/`) fournit à `Core` ce qu'il ne peut pas faire lui-même : `Find()`
+cherche `claude`/`claude.exe`/`claude.cmd` sur le PATH puis dans les emplacements connus
+(`%LOCALAPPDATA%\Microsoft\WinGet\Links\claude.exe`, `~/.local/bin/claude.exe`,
+`%APPDATA%\npm\claude.cmd`) ; `RunHiddenAsync` lance `claude -p` fenêtre cachée (stdin fermé
+aussitôt, stdout/stderr drainés en continu, tué à l'échéance) — passé à `TokenRenewal` en
+`runHidden` ; `SignIn` ouvre un terminal visible sur `claude auth login --claudeai` (`cmd /c
+start`) — posé sur `ClaudeSource.SignIn` par le `Controller` ; `ProcessStartFileTime(pid)` rend
+`Process.GetProcessById(pid).StartTime.ToFileTime()`, `null` sur toute exception (processus
+disparu, accès refusé) — passé à `SessionRegistry` pour juger la vivacité d'une session. Le
+`Controller` assemble la vraie `ClaudeSource` dans son constructeur (`BuildClaudeSource`) : le
+dossier `.claude` par défaut pour le jeton et les sessions, le dossier de données de l'app
+(`home`) pour `claude-backoff.json` (ce n'est pas un fichier de Claude Code) ; `TokenRenewal` se
+référence lui-même dans son délégué `runHidden` (`NoteLaunched`) pour que `SessionRegistry`
+ignore les pids qu'il vient de lancer. `SessionRegistry.Start()` est appelé à la fin de
+`Controller.Start()` (comme `ConfigStore.StartWatching()`) et `Dispose()` dans `Stop()`.
 
 ---
 
@@ -495,7 +526,7 @@ la pilule par défaut, avant le groupe Système.
 ## 7. Réglages
 
 `SettingsWindow` (`App/Settings/`) : sidebar 220 px (**Pilules & cellules**, **Sources**,
-**Général**), une page à droite, barre du bas avec **Fermer**. `Theme.ApplyChrome` pour la
+**Claude**, **Général**), une page à droite, barre du bas avec **Fermer**. `Theme.ApplyChrome` pour la
 barre de titre ; **une seule instance** : le tray, le menu clic-droit de la pilule et le
 `show` reçu par `SingleInstance` (une seconde copie lancée à la main) ouvrent ou ramènent la
 même fenêtre (`Controller.ShowSettings`).
@@ -519,8 +550,17 @@ même fenêtre (`Controller.ShowSettings`).
   validé, `secret` → champ masqué avec état « défini » + « Effacer ». `SchemaForm.ControlKind`
   est une fonction pure, testée sans fenêtre.
 - **Page « Sources »** : une section par type de source ayant des réglages globaux (aucun dans
-  cette version — Claude Code et ClickUp en auront, plan 3 — la page le dit) et la liste des
-  secrets de `secrets.json` : nom, « défini » (jamais la valeur), Effacer.
+  cette version — ClickUp en aura un, plan 0.4.0 §10 — la page le dit) et la liste des secrets de
+  `secrets.json` : nom, « défini » (jamais la valeur), Effacer.
+- **Page « Claude »** (`ClaudePage`) — carte **Compte** : abonnement, palier, jeton (« valide
+  jusqu'à 18:32 » / « expiré » / « aucun jeton »), CLI trouvé (chemin) ou non (« introuvable —
+  winget install Anthropic.ClaudeCode »), champ **dossier .claude** (autre compte, réglage global
+  de la source, `ConfigEditor.SetSourceGlobal("claude", …)`) ; boutons **Se connecter**
+  (`ClaudeSource.SignIn`) et **Relire maintenant** (`ClaudeSource.RefreshAll()`) ; carte
+  **Lecture** : dernière lecture, dernière erreur, prochain essai (backoff), dernier
+  renouvellement ; carte **Sessions** : une ligne par session (nom — état — depuis). Se
+  rafraîchit sur `ClaudeSource.StatusChanged` (marshalé sur le `Dispatcher`, désabonné à
+  `Detach()` comme `OnStoreChanged`) — jamais un minuteur propre, jamais le jeton affiché.
 - **Page « Général »** : emplacement de `cells.json` (chemin, Parcourir…, Ouvrir le dossier,
   « prise en compte au redémarrage »), une carte **Apparence** (nouvelle, avant **Poste**) —
   **indicateur d'activité** (Combo « Pastille seule » / « Anneau animé », `Appearance.Activity`,
@@ -581,10 +621,10 @@ Même patron que ClickUp-Extended, adapté au nom de l'application (`scripts/`, 
   `latest.json`, avec le jeton que Git détient déjà (`GITHUB_TOKEN`/`GH_TOKEN`, sinon le
   gestionnaire d'identifiants). L'adresse du manifeste devient alors
   `https://github.com/c-chares69/customNotch/releases/latest/download/latest.json`.
-- **`latest.json` est produit et publié dès maintenant** ; ce que le plan 2 ne fait pas encore,
-  c'est le **lire** : la vérification en tâche de fond et le bandeau de *Réglages → Général →
-  Mises à jour* arrivent au plan 3 (§10). En attendant, une nouvelle version se pose à la main
-  (le setup, ou `Installer` sur le manifeste publié).
+- **`latest.json` est produit et publié dès 0.2.0** ; ce qui manque encore, c'est le **lire** :
+  la vérification en tâche de fond et le bandeau de *Réglages → Général → Mises à jour* arrivent
+  en 0.3.1 (§10). En attendant, une nouvelle version se pose à la main (le setup, ou `Installer`
+  sur le manifeste publié).
 - **Icône** : `assets/customnotch.ico` (dessinée par `make-icon.ps1`) — menu Démarrer, barre
   des tâches, notifications, propriétés du fichier.
 
@@ -613,22 +653,21 @@ Même patron que ClickUp-Extended, adapté au nom de l'application (`scripts/`, 
 
 ## 10. Ce qui vient ensuite
 
-Hors périmètre des plans 1 et 2, posé par les specs (`docs/superpowers/specs/2026-09-22-customnotch-design.md`
-§6-§8, §12 ; `docs/superpowers/specs/2026-09-23-customnotch-settings-media-design.md` §7) :
+Hors périmètre des versions livrées jusqu'ici (0.1.0 à 0.3.0), posé par les specs
+(`docs/superpowers/specs/2026-09-22-customnotch-design.md` §6-§8, §12 ;
+`docs/superpowers/specs/2026-09-23-customnotch-settings-media-design.md` §7 ;
+`docs/superpowers/specs/2026-09-23-customnotch-claude-design.md` §4) :
 
-- **Claude Code** : lecture du jeton (`~/.claude/.credentials.json`), usage (`GET …/oauth/usage`),
-  renouvellement par `claude -p`, connexion (`claude auth login`), hooks installés dans
-  `~/.claude/settings.json`, serveur d'événements local (`HttpListener`, port **48667**),
-  `ActivityStore` (sessions, `running → done → dismissed`, `attention`).
-- **Source ClickUp** : endpoint local exposé par ClickUp-Extended (son propre sous-projet) ;
-  repli en simple lanceur tant qu'il ne répond pas.
-- **Mises à jour automatiques dans l'application** : le lecteur de `latest.json` (produit et
-  publié depuis ce plan, §8), *Réglages → Général → Mises à jour*, le téléchargement vérifié et
-  l'installation silencieuse.
-- **Diagnostic** (`--report`) : archive de bureau (journaux, configuration sans secret,
-  informations système), comme ClickUp-Extended.
-- **Glisser-déposer** dans l'arbre de la page Pilules & cellules (↑ ↓ suffisent pour l'instant).
-- **Position de lecture** du média (curseur, temps écoulé/restant), au-delà de titre et
-  play/pause.
-- **v1.1** : GPU et températures, détection plein écran affinée, plusieurs comptes Claude,
-  export/import de `cells.json` depuis Réglages.
+- **0.3.1 — Mises à jour dans l'application** : le lecteur de `latest.json` (produit et publié
+  depuis 0.2.0, §8) repris de ClickUp-Extended (`Updates.cs`), *Réglages → Général → Mises à
+  jour*, téléchargement vérifié (empreinte SHA-256 du manifeste) et installation silencieuse
+  (`/VERYSILENT /SUPPRESSMSGBOXES /NORESTART`, §8). **Diagnostic** (`--report`) : archive de
+  bureau (journaux, configuration sans secret, informations système), comme ClickUp-Extended.
+- **0.4.0 — Source ClickUp** : endpoint local exposé par ClickUp-Extended (son propre
+  sous-projet) ; la cellule `launcher` déjà posée par défaut (`DefaultCells`) reste un simple
+  lien tant qu'il ne répond pas.
+- **Plus tard** : GPU et températures, plusieurs comptes Claude (plusieurs cellules `claude`,
+  chacune avec son `home` — v1.1), macOS (codenotch existe déjà côté Mac ; portage de la pilule
+  et de `Platform/`, le cœur reste inchangé), glisser-déposer dans l'arbre de la page Pilules &
+  cellules (↑ ↓ suffisent pour l'instant), détection plein écran affinée, export/import de
+  `cells.json` depuis Réglages.

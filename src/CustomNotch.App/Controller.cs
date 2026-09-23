@@ -1,12 +1,15 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using CustomNotch.App.Notch;
+using CustomNotch.App.Platform;
 using CustomNotch.Core;
 using CustomNotch.Core.Actions;
 using CustomNotch.Core.Config;
 using CustomNotch.Core.Model;
 using CustomNotch.Core.Platform;
 using CustomNotch.Core.Sources;
+using CustomNotch.Core.Sources.Claude;
 
 namespace CustomNotch.App;
 
@@ -17,6 +20,7 @@ public sealed class Controller : IPillHost
     private readonly string _home;
     private readonly Platform.WindowsMediaSession _media = Platform.WindowsMediaSession.Create();
     private readonly SourceRegistry _registry;
+    private readonly SessionRegistry _claudeSessions;
     private readonly ReadingStore _readings = new();
     private readonly ConfigStore _config;
     private readonly ConfigEditor _editor;
@@ -31,13 +35,40 @@ public sealed class Controller : IPillHost
     public Controller(string home)
     {
         _home = home;
-        // ClaudeSource réel (jeton, HTTP, CLI, registre des sessions) posé au plan 4 ; en attendant, le
-        // registre garde le type "claude" connu (validation, catalogue) via l'instance sans délégué réel
-        // de CoreSources.Build.
-        _registry = CoreSources.Build(_media, null);
+        long Now() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var claude = BuildClaudeSource(home, Now, out var claudeSessions);
+        _claudeSessions = claudeSessions;
+        _registry = CoreSources.Build(_media, claude);
         _config = new ConfigStore(home, _registry.Schemas);
         _editor = new ConfigEditor(_config, _registry.Schemas);
-        _scheduler = new Scheduler(_registry, _readings, () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), Core.Platform.Idle.Ms);
+        _scheduler = new Scheduler(_registry, _readings, Now, Core.Platform.Idle.Ms);
+    }
+
+    /// <summary>La vraie ClaudeSource : jeton (~/.claude/.credentials.json), usage (HttpSource.Http), CLI trouvé
+    /// et lancé par ClaudeCli (App), registre des sessions du même dossier. Le backoff vit dans
+    /// <paramref name="home"/> (le dossier de données de l'app), pas dans .claude - ce n'est pas un fichier de
+    /// Claude Code.</summary>
+    private static ClaudeSource BuildClaudeSource(string home, Func<long> now, out SessionRegistry sessions)
+    {
+        var claudeDir = ClaudeCredentialsFile.DefaultDir();
+        // TokenRenewal doit prévenir le registre des sessions des pids qu'il vient de lancer (claude -p n'est
+        // pas une session de travail) - il se référence donc lui-même dans le délégué runHidden, posé après
+        // coup (NoteLaunched), plutôt que de faire connaître ClaudeCli à SessionRegistry directement.
+        TokenRenewal? renewalRef = null;
+        var renewal = new TokenRenewal(
+            () => ClaudeCredentialsFile.Read(claudeDir),
+            ClaudeCli.Find,
+            cli => ClaudeCli.RunHiddenAsync(cli, pid => renewalRef!.NoteLaunched(pid), TimeSpan.FromSeconds(30)),
+            now);
+        renewalRef = renewal;
+
+        sessions = new SessionRegistry(Path.Combine(claudeDir, "sessions"), ClaudeCli.ProcessStartFileTime, now);
+        var backoffPath = Path.Combine(home, "claude-backoff.json");
+        var usage = new UsageClient(HttpSource.Http, now);
+        return new ClaudeSource(ClaudeCredentialsFile.Read, usage, renewal, sessions, backoffPath, now)
+        {
+            SignIn = () => ClaudeCli.SignIn(ClaudeCli.Find() ?? "claude"),
+        };
     }
 
     private static Dispatcher Ui => Application.Current.Dispatcher;
@@ -67,6 +98,9 @@ public sealed class Controller : IPillHost
         _tick.Start();
         if (!_config.Load()) _tray.Notify("Configuration refusée", string.Join(" ; ", _config.LastErrors));
         _config.StartWatching();
+        // Watcher + tic de 2 s (SessionRegistry) : lancé ici, pas dans le constructeur, pour rester au même
+        // patron que ConfigStore.StartWatching() - rien qui tourne en tâche de fond avant Start().
+        _claudeSessions.Start();
         Log.Info("app", $"{Core.App.Name} {Core.App.Version} démarré, cells.json : {_config.CellsPath}");
     }
 
@@ -160,6 +194,7 @@ public sealed class Controller : IPillHost
         _settings = null;
         _scheduler.Dispose();
         _config.Dispose();
+        _claudeSessions.Dispose();
         _media.Dispose();
         _tray.Dispose();
         foreach (var p in _pills.Values) p.Close();

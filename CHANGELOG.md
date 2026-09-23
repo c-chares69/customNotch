@@ -16,6 +16,16 @@
   « inactive », « terminée il y a … ») ; **Attention** si une session attend, **Occupée** si une
   travaille. Actions « Actualiser » et « Se connecter » ; une lecture en échec garde la dernière
   valeur connue, marquée périmée avec la raison — jamais un chiffre inventé.
+- **Réglages → Claude.** Compte (abonnement, palier), jeton (« valide jusqu'à … » / « expiré »),
+  CLI Claude trouvé ou non, dernière lecture, prochain essai après une limite atteinte, sessions
+  en cours, dossier `.claude` (autre compte) ; boutons **Se connecter** (`claude auth login
+  --claudeai`, terminal visible) et **Relire maintenant**. Le jeton n'apparaît jamais dans
+  l'interface.
+- **Le projet `CustomNotch.Hook` est retiré** (solution, dépôt, docs) : le contrat qu'il portait
+  (serveur d'événements local, hooks installés dans `~/.claude/settings.json`) est remplacé par
+  le registre de sessions que Claude Code tient lui-même, lu directement par la cellule.
+- **Icônes précédent / suivant refaites** : triangle et barre pleins, lisibles à 16 px (au lieu
+  de tracés fins qui s'effaçaient à cette taille).
 
 ## 0.2.2 - 2026-09-23
 

@@ -47,6 +47,10 @@ public abstract class PageBase : UserControl
         _detach.Add(() => Ctx.Store.Changed -= h);
     }
 
+    /// <summary>Note un désabonnement générique à exécuter par Detach() - pour une page qui s'abonne à autre
+    /// chose que ConfigStore (ClaudePage à ClaudeSource.StatusChanged, par exemple).</summary>
+    protected void OnDetach(Action undo) => _detach.Add(undo);
+
     public void Detach()
     {
         foreach (var undo in _detach) undo();

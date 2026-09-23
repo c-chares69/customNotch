@@ -4,10 +4,11 @@ using CustomNotch.Core.Sources.Media;
 namespace CustomNotch.Core.Sources;
 
 /// <summary>Toutes les sources livrées avec le cœur, dans un registre neuf. La session média est fournie par
-/// l'application (WinRT) ; null = la source média se dit hors service. <paramref name="claude"/> vient de
-/// l'App (jeton, HTTP, CLI, registre des sessions — plan 4) ; null (tests, avant ce câblage) retombe sur une
-/// instance sans délégué réel : le type <c>claude</c> reste connu de la validation et du catalogue, sa lecture
-/// n'est simplement jamais sollicitée tant que le contrôleur n'en construit pas une vraie.</summary>
+/// l'application (WinRT) ; null = la source média se dit hors service. <paramref name="claude"/> vient du
+/// Controller (jeton, HTTP, CLI trouvé par <c>ClaudeCli</c>, registre des sessions) : l'App fournit toujours
+/// l'instance réelle. <c>null</c> (tests, catalogue de schémas) retombe sur une instance à vide
+/// (<see cref="StubClaude"/>) : le type <c>claude</c> reste connu de la validation et du formulaire de la
+/// fenêtre Réglages sans toucher au disque ni au réseau, sa lecture n'étant simplement jamais sollicitée.</summary>
 public static class CoreSources
 {
     public static SourceRegistry Build(IMediaSession? media = null, ClaudeSource? claude = null)
@@ -18,21 +19,18 @@ public static class CoreSources
         registry.Register(new HttpSource());
         registry.Register(new ShellSource());
         registry.Register(new MediaSource(media));
-        registry.Register(claude ?? DefaultClaude());
+        registry.Register(claude ?? StubClaude());
         return registry;
     }
 
-    private static ClaudeSource DefaultClaude()
+    /// <summary>Ni fichier ni réseau : chaque délégué rend systématiquement « rien » (pas de jeton, pas de CLI,
+    /// pas de pid vivant). Sert uniquement à ce que <c>Schemas</c>/<c>Types</c> connaissent le type <c>claude</c>
+    /// (tests de configuration, catalogue) - jamais construite par le Controller, qui passe toujours la vraie.</summary>
+    private static ClaudeSource StubClaude()
     {
         long Now() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        var dir = ClaudeCredentialsFile.DefaultDir();
-        var usage = new UsageClient(HttpSource.Http, Now);
-        // Sans CLI ni sans façon de vérifier qu'un pid est vivant (délégués posés par l'App, plan 4), le
-        // renouvellement échoue simplement et le registre des sessions ne montre jamais rien - jamais
-        // d'exception, une cellule qui se dit juste hors service tant que le vrai câblage n'est pas en place.
-        var renewal = new TokenRenewal(() => ClaudeCredentialsFile.Read(dir), () => null, _ => Task.FromResult(-1), Now);
-        var sessions = new SessionRegistry(Path.Combine(dir, "sessions"), _ => null, Now);
-        var backoffPath = Path.Combine(dir, "claude-backoff.json");
-        return new ClaudeSource(ClaudeCredentialsFile.Read, usage, renewal, sessions, backoffPath, Now);
+        var renewal = new TokenRenewal(() => null, () => null, _ => Task.FromResult(-1), Now);
+        var sessions = new SessionRegistry("", _ => null, Now);
+        return new ClaudeSource(_ => null, new UsageClient(HttpSource.Http, Now), renewal, sessions, "", Now);
     }
 }
