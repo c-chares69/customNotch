@@ -1186,7 +1186,7 @@ git commit -m "feat(app): session média WinRT branchée sur la source media"
 
 **Interfaces:**
 - Consumes: `ConfigStore` (`Current`, `Changed`, `App`, `Secrets`, `CellsPath`), `ConfigEditor`, `SourceRegistry`, `Theme` (`Apply`, `ApplyChrome`, `ResolveTheme`), `Ui` (`Text`, `FormRow`, `FormLabel`), `ActionRunner.Open`, `Log.Directory`, `App.Version`.
-- Produces: `record SettingsContext(ConfigStore Store, ConfigEditor Editor, SourceRegistry Registry)`, `abstract class PageBase : UserControl` (`Ctx`, `Body`, `Refresh()`, `Detach()`, `Section(text)`, `Card(content)`, `Row(label, field)`, `Combo(items, value, onChange)`, `Debounced(TextBox, Action<string>)`), `SettingsWindow(SettingsContext)` avec `Go(string pageKey)`, `Controller.ShowSettings()` = une seule fenêtre, `Autostart.IsEnabled()/SetEnabled(bool)/LaunchCommand()`.
+- Produces: `record SettingsContext(ConfigStore Store, ConfigEditor Editor, SourceRegistry Registry)`, `abstract class PageBase : UserControl` (`Ctx`, `Body`, `Refresh()`, `Detach()`, `Section(text)`, `Card(content)`, `Row(label, field)`, `Combo(items, value, onChange)`, `Debounced(string initial, Action<string> onChange, double width = 360)`), `SettingsWindow(SettingsContext)` avec `Go(string pageKey)`, `Controller.ShowSettings()` = une seule fenêtre, `Autostart.IsEnabled()/SetEnabled(bool)/LaunchCommand()`.
 
 - [ ] **Step 1: Styles de contrôles repris de ClickUp-Extended**
 
