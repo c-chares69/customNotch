@@ -6,6 +6,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Styles.xaml" />
+                <ResourceDictionary Source="Shared/Controls.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <FontFamily x:Key="UiFont">Segoe UI</FontFamily>
         </ResourceDictionary>

@@ -18,10 +18,12 @@ public sealed class Controller : IPillHost
     private readonly SourceRegistry _registry;
     private readonly ReadingStore _readings = new();
     private readonly ConfigStore _config;
+    private readonly ConfigEditor _editor;
     private readonly Scheduler _scheduler;
     private readonly Dictionary<string, PillWindow> _pills = new();
     private readonly TrayIcon _tray = new();
     private readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromSeconds(1) };
+    private Settings.SettingsWindow? _settings;
     private bool _allHidden;
     private bool _stopped;
 
@@ -30,6 +32,7 @@ public sealed class Controller : IPillHost
         _home = home;
         _registry = CoreSources.Build(_media);
         _config = new ConfigStore(home, _registry.Schemas);
+        _editor = new ConfigEditor(_config, _registry.Schemas);
         _scheduler = new Scheduler(_registry, _readings, () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), Core.Platform.Idle.Ms);
     }
 
@@ -111,8 +114,18 @@ public sealed class Controller : IPillHost
         _config.SetPillLocal(id, p => p["visible"] = !current);
     }
 
-    /// <summary>Pas encore de fenêtre de réglages (plan 2) : on ouvre cells.json dans l'éditeur par défaut.</summary>
-    public void ShowSettings() => ActionRunner.Open(_config.CellsPath);
+    /// <summary>Une seule fenêtre Réglages : réouverte ou ramenée au premier plan.</summary>
+    public void ShowSettings()
+    {
+        if (_settings is null)
+        {
+            _settings = new Settings.SettingsWindow(new Settings.SettingsContext(_config, _editor, _registry));
+            _settings.Closed += (_, _) => _settings = null;
+        }
+        _settings.Show();
+        if (_settings.WindowState == WindowState.Minimized) _settings.WindowState = WindowState.Normal;
+        _settings.Activate();
+    }
 
     public void Quit()
     {
@@ -137,6 +150,7 @@ public sealed class Controller : IPillHost
         _config.Dispose();
         _media.Dispose();
         _tray.Dispose();
+        _settings?.Close();
         foreach (var p in _pills.Values) p.Close();
         _pills.Clear();
     }

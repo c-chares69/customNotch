@@ -1,0 +1,62 @@
+using System.IO;
+using System.Windows;
+using System.Windows.Controls;
+using CustomNotch.Core;
+using CustomNotch.Core.Actions;
+using CustomNotch.Core.Platform;
+
+namespace CustomNotch.App.Settings;
+
+public sealed class GeneralPage : PageBase
+{
+    private static readonly (string, string)[] Themes = { ("system", "Automatique (suit Windows)"), ("light", "Clair"), ("dark", "Sombre") };
+    private readonly TextBox _cellsPath;
+    private readonly CheckBox _autostart = new() { Content = "Lancer customNotch à l'ouverture de session" };
+
+    public GeneralPage(SettingsContext ctx) : base(ctx, "Général", "L'emplacement de la configuration, le démarrage, le thème.")
+    {
+        _cellsPath = new TextBox { Text = ctx.Store.CellsPath, IsReadOnly = true, Width = 460, HorizontalAlignment = HorizontalAlignment.Left };
+        var browse = Btn("Parcourir…", () =>
+        {
+            var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "cells.json|*.json", FileName = ctx.Store.CellsPath, CheckFileExists = false };
+            if (dialog.ShowDialog() != true) return;
+            ctx.Store.App.Set("cells_path", dialog.FileName);
+            ctx.Store.App.Save();
+            _cellsPath.Text = dialog.FileName + "  (au prochain démarrage)";
+        });
+        var openDir = Btn("Ouvrir le dossier", () => ActionRunner.Open(Path.GetDirectoryName(ctx.Store.CellsPath)!));
+        var pathRow = new StackPanel { Orientation = Orientation.Horizontal };
+        pathRow.Children.Add(_cellsPath); browse.Margin = new Thickness(8, 0, 8, 0); pathRow.Children.Add(browse); pathRow.Children.Add(openDir);
+        var hint = Ui.Text("Mets ce fichier dans un dossier synchronisé pour retrouver tes pilules sur une autre machine ; la position et l'écran restent propres à chaque poste.", 11, null, "Muted");
+        hint.TextWrapping = TextWrapping.Wrap;
+
+        Body.Children.Add(Section("Configuration"));
+        Body.Children.Add(Card(Stack(Row("Fichier cells.json", pathRow), hint)));
+
+        _autostart.IsChecked = Autostart.IsEnabled();
+        _autostart.Checked += (_, _) => Autostart.SetEnabled(true);
+        _autostart.Unchecked += (_, _) => Autostart.SetEnabled(false);
+        var theme = Combo(Themes, ctx.Store.App.GetString("appearance.theme", "system"), v =>
+        {
+            ctx.Store.App.Set("appearance.theme", v);
+            ctx.Store.App.Save();
+            Theme.Apply(Application.Current, ctx.Store.App);
+        });
+        Body.Children.Add(Section("Poste"));
+        Body.Children.Add(Card(Stack(Row("Démarrage", _autostart), Row("Thème des fenêtres", theme))));
+
+        var journal = Btn("Ouvrir le journal", () => { if (Log.Directory is { } d) ActionRunner.Open(d); });
+        var repo = Btn("Le dépôt sur GitHub", () => ActionRunner.Open("https://github.com/c-chares69/customNotch"), "GhostButton");
+        var about = new StackPanel { Orientation = Orientation.Horizontal };
+        about.Children.Add(journal); about.Children.Add(repo);
+        Body.Children.Add(Section("À propos"));
+        Body.Children.Add(Card(Stack(Row($"customNotch {Core.App.Version}", about))));
+    }
+
+    private static StackPanel Stack(params UIElement[] children)
+    {
+        var s = new StackPanel();
+        foreach (var c in children) s.Children.Add(c);
+        return s;
+    }
+}
