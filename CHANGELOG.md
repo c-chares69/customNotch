@@ -1,5 +1,14 @@
 # Journal des versions
 
+## 0.3.2 - 2026-09-23
+
+- **La fenêtre Réglages au gabarit de ClickUp-Extended.** Coquille refaite sur le patron de
+  `HubWindow.xaml` (sidebar 240 px avec marque et navigation à glyph, en-tête de page dessiné par
+  la fenêtre, défilement rembourré, pied Fermer inchangé) et briques refaites sur le patron de
+  `SettingsPages` (`Card`, `Row`, `Hint`, `Problem`, `Check`, `Combo`, `Number`, `Text`, `Action`) ;
+  les pages seront recomposées avec ces briques dans une prochaine version, sans changement de
+  comportement en attendant.
+
 ## 0.3.1 - 2026-09-23
 
 - **La carte Claude sur mesure.** Par défaut, elle ne montre plus que la consommation : les

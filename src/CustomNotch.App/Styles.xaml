@@ -121,40 +121,12 @@
             </Setter.Value>
         </Setter>
     </Style>
-    <!-- Navigation de la fenêtre Réglages (patron AutoSort, pinceaux de notre palette). -->
-    <Style x:Key="NavList" TargetType="ListBox">
+    <!-- L'arbre pilules → cellules : une liste indentée. La navigation de la fenêtre Réglages est maintenant les
+         RadioButton NavItem (Shared/Controls.xaml, copiés de HubWindow.xaml) ; TreeList n'a plus besoin d'hériter
+         d'elle, sa propre base (Background transparent, pas de bordure) suffit. -->
+    <Style x:Key="TreeList" TargetType="ListBox">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="ItemContainerStyle">
-            <Setter.Value>
-                <Style TargetType="ListBoxItem">
-                    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
-                    <Setter Property="Cursor" Value="Hand" />
-                    <Setter Property="Template">
-                        <Setter.Value>
-                            <ControlTemplate TargetType="ListBoxItem">
-                                <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Margin="0,2" Padding="12,9" Height="40">
-                                    <ContentPresenter VerticalAlignment="Center" />
-                                </Border>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceHover}" />
-                                        <Setter Property="Foreground" Value="{DynamicResource Fg}" />
-                                    </Trigger>
-                                    <Trigger Property="IsSelected" Value="True">
-                                        <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Accent}" />
-                                        <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
-                                    </Trigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </Setter.Value>
-                    </Setter>
-                </Style>
-            </Setter.Value>
-        </Setter>
-    </Style>
-    <!-- L'arbre pilules → cellules : une liste indentée, stylée comme la navigation mais en Surface. -->
-    <Style x:Key="TreeList" TargetType="ListBox" BasedOn="{StaticResource NavList}">
         <Setter Property="ItemContainerStyle">
             <Setter.Value>
                 <Style TargetType="ListBoxItem">

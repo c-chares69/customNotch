@@ -1,14 +1,27 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 using System.Windows.Threading;
+using Button = System.Windows.Controls.Button;
 
 namespace CustomNotch.App.Settings;
 
-/// <summary>Les briques communes à une page (PageBase) et à un éditeur (PillEditor, CellEditor) : section, carte,
-/// ligne de formulaire, combo, champ à anti-rebond, bouton. Un éditeur n'est pas une page (il n'a ni en-tête ni
-/// défilement propre), donc ces briques vivent ici plutôt que dans PageBase — les deux les appellent.</summary>
+/// <summary>Les briques communes à une page (PageBase) et à un éditeur (PillEditor, CellEditor) : carte, ligne de
+/// formulaire, combo, case à cocher, champ numérique, champ texte, bouton, indication, message d'erreur — reprises
+/// de <c>SettingsPages</c> (ClickUp-Extended), statiques ici (pas d'instance de page à porter) donc chaque brique
+/// reçoit son <see cref="FrameworkElement"/> hôte pour <c>FindResource</c>, exactement comme <c>_host</c> là-bas.
+/// Un éditeur n'est pas une page (il n'a ni en-tête ni défilement propre), donc ces briques vivent ici plutôt que
+/// dans PageBase — les deux les appellent.
+///
+/// Les membres qui suivent la signature d'origine (Section, Card(content), Row(label,field,labelWidth), Combo sans
+/// hôte, Debounced, Btn) restent tels quels : les pages non encore recomposées (Task 2) les appellent encore, et
+/// rien ne doit changer sous elles avant leur tour.</summary>
 internal static class Bricks
 {
+    // ------------------------------------------------------------------ briques d'origine (compatibilité, Task 2 les retire)
+
     public static TextBlock Section(string text)
     {
         var t = Ui.Text(text.ToUpperInvariant(), 11, FontWeights.SemiBold, "Muted");
@@ -24,7 +37,11 @@ internal static class Bricks
         return card;
     }
 
-    public static Grid Row(string label, UIElement field, double labelWidth = 220) => Ui.FormRow(Ui.FormLabel(label), field, labelWidth);
+    /// <summary>La ligne de formulaire de base : libellé dans une colonne fixe, champ borné à 640 px et calé à
+    /// gauche. <paramref name="labelWidth"/> défaut à 240 (le gabarit SettingsPages, Ui.FormRow) ; toutes les pages
+    /// d'avant Task 2 passent leur propre largeur via leur wrapper local (PageBase.Row, CellEditor.Row…), donc ce
+    /// changement de défaut ne change rien sous elles.</summary>
+    public static Grid Row(string label, UIElement field, double labelWidth = 240) => Ui.FormRow(Ui.FormLabel(label), field, labelWidth);
 
     /// <summary>Une liste déroulante valeur/libellé qui rappelle onChange avec la valeur choisie.</summary>
     public static ComboBox Combo(IReadOnlyList<(string Value, string Label)> items, string? current, Action<string> onChange, double minWidth = 220)
@@ -86,5 +103,155 @@ internal static class Bricks
         panel.Children.Add(label);
         panel.Children.Add(slider);
         return panel;
+    }
+
+    // ------------------------------------------------------------------ briques façon SettingsPages (ClickUp-Extended)
+
+    /// <summary>Une indication sous un champ ou en fin de carte, style Hint.</summary>
+    public static TextBlock Hint(FrameworkElement host, string text) => new() { Text = text, Style = (Style)host.FindResource("Hint") };
+
+    /// <summary>Le message d'erreur sous un champ fautif : absent (Collapsed) tant qu'il n'y a rien à dire. Couleur
+    /// Warn, comme SettingsPages.Problem (ClickUp-Extended) — pas Danger : une valeur refusée qu'on peut corriger
+    /// tout de suite n'est pas la même gravité qu'une configuration cassée.</summary>
+    public static TextBlock Problem(FrameworkElement host)
+        => new() { Style = (Style)host.FindResource("Hint"), Foreground = (Brush)host.FindResource("Warn"), Margin = new Thickness(2, 4, 0, 0), Visibility = Visibility.Collapsed };
+
+    public static void Say(TextBlock problem, string text)
+    {
+        problem.Text = text;
+        problem.Visibility = text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>Une case à cocher qui écrit tout de suite au clic ; <paramref name="hint"/> (facultatif) devient
+    /// son infobulle.</summary>
+    public static CheckBox Check(FrameworkElement host, string label, bool value, Action<bool> commit, string? hint = null)
+    {
+        var box = new CheckBox { Content = label, IsChecked = value, Margin = new Thickness(0, 7, 0, 5), Foreground = (Brush)host.FindResource("Fg"), ToolTip = hint };
+        box.Click += (_, _) => commit(box.IsChecked == true);
+        return box;
+    }
+
+    /// <summary>Une ligne de formulaire complète : libellé + liste déroulante valeur/libellé, qui rappelle commit
+    /// avec la valeur choisie.</summary>
+    public static Grid Combo(FrameworkElement host, string label, IReadOnlyList<(string Value, string Text)> options, string? current, Action<string> commit)
+    {
+        var combo = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
+        foreach (var (value, text) in options) combo.Items.Add(new ComboBoxItem { Content = text, Tag = value, IsSelected = value == current });
+        if (combo.SelectedIndex < 0) combo.SelectedIndex = 0;
+        combo.SelectionChanged += (_, _) => { if (combo.SelectedItem is ComboBoxItem it && it.Tag is string v) commit(v); };
+        return Row(label, combo);
+    }
+
+    /// <summary>Une ligne de formulaire complète : champ numérique 110 px + boutons − / + + suffixe (« px », « h »…),
+    /// commit à l'Entrée ou à la perte du focus, bornée à [min, max] et arrondie à <paramref name="decimals"/>.</summary>
+    public static Grid Number(FrameworkElement host, string label, double value, double min, double max, Action<double> commit, string suffix = "", int decimals = 0, double step = 1)
+    {
+        var current = value;
+        var box = new TextBox { Width = 110, Padding = new Thickness(8, 6, 8, 6), Text = value.ToString("0.##", CultureInfo.InvariantCulture), Style = (Style)host.FindResource("Field"), HorizontalAlignment = HorizontalAlignment.Left };
+        void Commit()
+        {
+            if (!double.TryParse(box.Text.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var v)) { box.Text = current.ToString("0.##", CultureInfo.InvariantCulture); return; }
+            v = Math.Clamp(Math.Round(v, decimals), min, max);
+            current = v;
+            box.Text = v.ToString("0.##", CultureInfo.InvariantCulture);
+            commit(v);
+        }
+        box.LostKeyboardFocus += (_, _) => Commit();
+        box.KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) Commit(); };
+        var panel = new StackPanel { Orientation = Orientation.Horizontal };
+        panel.Children.Add(box);
+        var minus = new Button { Content = "−", Width = 30, Margin = new Thickness(6, 0, 0, 0), Style = (Style)host.FindResource("Secondary"), Padding = new Thickness(0) };
+        var plus = new Button { Content = "+", Width = 30, Margin = new Thickness(3, 0, 0, 0), Style = (Style)host.FindResource("Secondary"), Padding = new Thickness(0) };
+        minus.Click += (_, _) => { box.Text = (current - step).ToString("0.##", CultureInfo.InvariantCulture); Commit(); };
+        plus.Click += (_, _) => { box.Text = (current + step).ToString("0.##", CultureInfo.InvariantCulture); Commit(); };
+        panel.Children.Add(minus);
+        panel.Children.Add(plus);
+        if (suffix.Length > 0) panel.Children.Add(new TextBlock { Text = suffix, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0), Foreground = (Brush)host.FindResource("Muted") });
+        return Row(label, panel);
+    }
+
+    /// <summary>Une ligne de formulaire complète : champ texte (ou <see cref="PasswordBox"/> si <paramref name="secret"/>),
+    /// commit à l'Entrée ou à la perte du focus — pas d'anti-rebond 300 ms ici, c'est le modèle SettingsPages : la
+    /// frappe s'applique à la validation, pas à chaque touche. <paramref name="validate"/> rend le message d'erreur à
+    /// afficher sous le champ, ou null si la valeur est acceptée.</summary>
+    public static Grid Text(FrameworkElement host, string label, string value, Action<string> commit, string? placeholder = null, bool secret = false, Func<string, string?>? validate = null)
+    {
+        var panel = new StackPanel();
+        var problem = Problem(host);
+        var current = value;
+        if (secret)
+        {
+            // Un secret ne s'affiche pas en clair : PasswordBox, même commit.
+            var pw = new PasswordBox { Password = value, Padding = new Thickness(10, 7, 10, 7), HorizontalAlignment = HorizontalAlignment.Stretch, ToolTip = placeholder, Background = (Brush)host.FindResource("Bg"), Foreground = (Brush)host.FindResource("Fg"), BorderBrush = (Brush)host.FindResource("Border") };
+            void CommitSecret() { var v = pw.Password.Trim(); if (v != current) { current = v; commit(v); } }
+            pw.LostKeyboardFocus += (_, _) => CommitSecret();
+            pw.KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) CommitSecret(); };
+            panel.Children.Add(pw);
+            panel.Children.Add(problem);
+            return Row(label, panel);
+        }
+        var box = new TextBox { Padding = new Thickness(10, 7, 10, 7), Text = value, Style = (Style)host.FindResource("Field"), HorizontalAlignment = HorizontalAlignment.Stretch, ToolTip = placeholder };
+        void Commit()
+        {
+            var v = box.Text.Trim();
+            if (validate is not null)
+            {
+                var message = validate(v);
+                Say(problem, message ?? "");
+                if (message is not null) return;
+            }
+            if (v == current) return;
+            current = v;
+            commit(v);
+        }
+        box.LostKeyboardFocus += (_, _) => Commit();
+        box.KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) Commit(); };
+        panel.Children.Add(box);
+        panel.Children.Add(problem);
+        return Row(label, panel);
+    }
+
+    /// <summary>Un bouton, plein (Primary) ou discret (Secondary).</summary>
+    public static Button Action(FrameworkElement host, string text, Action click, bool primary = false)
+    {
+        var button = new Button { Content = text, Style = (Style)host.FindResource(primary ? "Primary" : "Secondary"), Padding = new Thickness(14, 7, 14, 7), HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 6, 0, 2) };
+        button.Click += (_, _) => click();
+        return button;
+    }
+
+    /// <summary>Une carte : titre en capitales (style Section) puis le contenu. Une suite de cases à cocher se range
+    /// sur deux colonnes à partir de quatre — la carte pleine largeur ne laisse plus une colonne de cases collée à
+    /// gauche.</summary>
+    public static Border Card(FrameworkElement host, string title, params UIElement[] children)
+    {
+        var stack = new StackPanel();
+        stack.Children.Add(new TextBlock { Text = title.ToUpperInvariant(), Style = (Style)host.FindResource("Section"), Margin = new Thickness(0, 0, 0, 12) });
+        var run = new List<CheckBox>();
+        void Flush()
+        {
+            if (run.Count >= 4)
+            {
+                var grid = new UniformGrid { Columns = 2, Margin = new Thickness(0, 2, 0, 2) };
+                foreach (var box in run) { box.Margin = new Thickness(0, 6, 16, 6); grid.Children.Add(box); }
+                stack.Children.Add(grid);
+            }
+            else foreach (var box in run) stack.Children.Add(box);
+            run.Clear();
+        }
+        foreach (var child in children)
+        {
+            if (child is CheckBox box) { run.Add(box); continue; }
+            Flush();
+            stack.Children.Add(child);
+        }
+        Flush();
+        return new Border { Style = (Style)host.FindResource("Card"), Child = stack, HorizontalAlignment = HorizontalAlignment.Stretch };
+    }
+
+    public static StackPanel Page(params UIElement[] cards)
+    {
+        var page = new StackPanel();
+        foreach (var card in cards) page.Children.Add(card);
+        return page;
     }
 }

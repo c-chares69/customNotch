@@ -530,11 +530,28 @@ ignore les pids qu'il vient de lancer. `SessionRegistry.Start()` est appelé à 
 
 ## 7. Réglages
 
-`SettingsWindow` (`App/Settings/`) : sidebar 220 px (**Pilules & cellules**, **Sources**,
-**Claude**, **Général**), une page à droite, barre du bas avec **Fermer**. `Theme.ApplyChrome` pour la
-barre de titre ; **une seule instance** : le tray, le menu clic-droit de la pilule et le
-`show` reçu par `SingleInstance` (une seconde copie lancée à la main) ouvrent ou ramènent la
-même fenêtre (`Controller.ShowSettings`).
+`SettingsWindow` (`App/Settings/`), au gabarit de `HubWindow.xaml` (ClickUp-Extended) : sidebar
+240 px — marque (tuile 34×34 dégradée portant le symbole de l'icône, « customNotch » puis
+« Réglages »), navigation à glyph (`RadioButton` style `NavItem`, un trait d'accent à gauche sur
+l'actif — **Pilules & cellules**, **Sources**, **Claude**, puis sous l'intitulé « SYSTÈME »,
+**Général**), version en bas — puis à droite l'en-tête de la page (titre 22 semi-gras, sous-titre
+en style `Hint`, dessinés par la fenêtre à chaque bascule de page depuis `PageBase.Title` /
+`Subtitle` — une page n'a plus son propre en-tête), un défilement rembourré (36,12,18,24) et la
+barre du bas avec **Fermer**. `Theme.ApplyChrome` pour la barre de titre ; **une seule instance** :
+le tray, le menu clic-droit de la pilule et le `show` reçu par `SingleInstance` (une seconde copie
+lancée à la main) ouvrent ou ramènent la même fenêtre (`Controller.ShowSettings`) ; `Go(key)`
+coche la `RadioButton` de cette clé, ce qui affiche la page comme un clic.
+
+**Les briques** (`Bricks.cs`, statiques, pendant de `SettingsPages` — ClickUp-Extended) : `Card(host,
+title, children…)` (titre en capitales, cases à cocher sur deux colonnes à partir de quatre),
+`Page(cards…)`, `Row(label, field)` (`Ui.FormRow`, libellé 240 px), `Hint(host, text)`,
+`Problem(host)` / `Say(problem, text)` (message sous un champ fautif, couleur Warn — pas Danger),
+`Check`, `Combo`, `Number` (champ 110 px + − / + + suffixe), `Text` (commit à l'Entrée ou à la
+perte du focus, `validate` rend le message d'erreur ou `null`), `Action` (bouton `Primary` /
+`Secondary`) : les pages les adoptent une à une (Task 2 du plan 0.3.2) ; en attendant, les
+anciennes signatures (`Section`, `Card(content)`, `Row(label, field, labelWidth)`, `Combo` sans
+hôte, `Debounced`, `Btn`, `Slider`) restent, inchangées, pour que les pages non recomposées
+continuent de compiler et de se comporter à l'identique.
 
 - **Page « Pilules & cellules »** — maître-détail : un arbre pilule → cellules à gauche
   (`PillsPage`, cellule masquée grisée, enfants d'un groupe indentés dessous) avec une barre
@@ -596,7 +613,8 @@ même fenêtre (`Controller.ShowSettings`).
   configuration), le local (`cells.<machine>.json` — visibilité d'une cellule, comme la
   position d'un drag) ou `secrets.json` (champ `secret` : la valeur y va chiffrée, `params`
   garde `${secret:<cellId>.<champ>}`). Une écriture refusée (`ConfigException`) affiche un
-  bandeau rouge en tête de l'éditeur (`EditorBanner`) sans perdre la valeur saisie, qui reste
+  bandeau (`EditorBanner`, fond Warn et texte sombre — comme le `Banner` de `HubWindow.xaml`) en
+  tête de l'éditeur sans perdre la valeur saisie, qui reste
   dans son champ pour être corrigée ; le focus clavier est restauré après la reconstruction
   d'un champ modifié pendant la frappe (curseurs, `TextBox`), pour qu'une flèche ou une lettre
   suivante ne parte pas dans le vide. `cells.json` est réécrit avec un en-tête fixe de deux

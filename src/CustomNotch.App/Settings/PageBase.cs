@@ -4,7 +4,10 @@ using CustomNotch.Core.Config;
 
 namespace CustomNotch.App.Settings;
 
-/// <summary>Une page : en-tête (titre, sous-titre) et corps vertical, dans un défilement. Les briques communes
+/// <summary>Une page : un corps vertical de cartes (Body), sans en-tête ni défilement propres — la coquille
+/// (SettingsWindow) les dessine désormais, comme HubWindow.xaml dessine PageTitle/PageSubtitle/PageScroll une
+/// seule fois pour toutes les pages plutôt que chacune la sienne. Title/Subtitle restent portés par la page (posés
+/// une fois au constructeur) : la fenêtre les lit à chaque bascule de page (Show(key)). Les briques communes
 /// (section, carte, ligne de formulaire, combo, champ à anti-rebond, bouton) sont dans Bricks, partagées avec les
 /// éditeurs ; ici, de simples forwarders pour que les pages existantes appellent Section(...) sans préfixe.</summary>
 public abstract class PageBase : UserControl
@@ -19,22 +22,19 @@ public abstract class PageBase : UserControl
     protected PageBase(SettingsContext ctx, string title, string subtitle = "")
     {
         Ctx = ctx;
-        var header = new StackPanel { Margin = new Thickness(0, 0, 0, 18) };
-        header.Children.Add(Ui.Text(title, 21, FontWeights.SemiBold));
-        if (subtitle.Length > 0)
-        {
-            var sub = Ui.Text(subtitle, 12, null, "Muted");
-            sub.TextWrapping = TextWrapping.Wrap;
-            sub.Margin = new Thickness(0, 4, 0, 0);
-            header.Children.Add(sub);
-        }
-        var stack = new StackPanel { Margin = new Thickness(28, 22, 28, 20) };
-        stack.Children.Add(header);
-        stack.Children.Add(Body);
-        Content = new ScrollViewer { Content = stack, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false };
+        Title = title;
+        Subtitle = subtitle;
+        Content = Body;
     }
 
     protected SettingsContext Ctx { get; }
+
+    /// <summary>Le titre de l'en-tête (22 semi-gras) et son sous-titre (Hint) — dessinés par SettingsWindow, pas
+    /// ici : une page n'a plus de ScrollViewer ni de marge à elle, c'est la fenêtre qui les pose (36,12,18,24),
+    /// comme HubWindow.xaml.</summary>
+    public string Title { get; }
+
+    public string Subtitle { get; }
 
     /// <summary>Relit l'état et reconstruit ce qui doit l'être (appelé à l'ouverture et quand la config change ailleurs).</summary>
     public virtual void Refresh() { }
@@ -66,7 +66,7 @@ public abstract class PageBase : UserControl
 
     /// <summary>Briques déléguées à Bricks (partagées avec les éditeurs, qui ne sont pas des pages) : mêmes
     /// signatures et mêmes valeurs par défaut qu'avant l'extraction, pour que les pages existantes n'aient rien à
-    /// changer.</summary>
+    /// changer avant leur recomposition (Task 2).</summary>
     protected static TextBlock Section(string text) => Bricks.Section(text);
 
     protected static Border Card(UIElement content) => Bricks.Card(content);

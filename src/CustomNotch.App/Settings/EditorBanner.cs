@@ -1,24 +1,25 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 
 namespace CustomNotch.App.Settings;
 
-/// <summary>Le message d'une configuration refusée, en tête de l'éditeur : rouge, effacé à la prochaine opération réussie.
-/// La valeur fautive reste dans son champ pour être corrigée.</summary>
+/// <summary>Le message d'une configuration refusée, en tête de l'éditeur : effacé à la prochaine opération réussie,
+/// la valeur fautive reste dans son champ pour être corrigée. Stylé comme le Banner de HubWindow.xaml
+/// (ClickUp-Extended) : fond Warn, texte sombre — pas de rouge, le message dit ce qui a été refusé, il ne casse
+/// rien.</summary>
 public sealed class EditorBanner : Border
 {
-    private readonly TextBlock _text = Ui.Text("", 12, FontWeights.SemiBold, "Danger");
+    private static readonly SolidColorBrush DarkText = new(Color.FromRgb(0x1B, 0x1C, 0x24));
+    private readonly TextBlock _text = new() { FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = DarkText, TextWrapping = TextWrapping.Wrap };
 
     public EditorBanner()
     {
         Child = _text;
-        _text.TextWrapping = TextWrapping.Wrap;
-        Padding = new Thickness(12, 8, 12, 8);
+        Padding = new Thickness(14, 8, 14, 8);
         CornerRadius = new CornerRadius(8);
         Margin = new Thickness(0, 0, 0, 12);
-        BorderThickness = new Thickness(1);
-        SetResourceReference(BorderBrushProperty, "Danger");
-        Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(28, 240, 101, 94));
+        SetResourceReference(BackgroundProperty, "Warn");
         Visibility = Visibility.Collapsed;
     }
 
