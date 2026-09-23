@@ -118,10 +118,11 @@ public static class SchemaForm
 
     /// <summary>Un champ texte à anti-rebond (300 ms) ; rouge tant qu'un nombre attendu n'en est pas un. Au démontage,
     /// une valeur en attente est validée tout de suite plutôt que perdue ou écrite à l'aveugle après coup sur un
-    /// éditeur qui n'existe plus.</summary>
+    /// éditeur qui n'existe plus. Nommé d'après le champ (x:Name) : PillsPage.ShowEditor() s'en sert pour retrouver
+    /// ce même contrôle dans l'éditeur reconstruit après une écriture et y rendre le focus.</summary>
     private static TextBox Text(SchemaField field, JsonObject? parameters, Action<string> commit)
     {
-        var box = new TextBox { Text = InitialText(field, parameters), Width = 340, HorizontalAlignment = HorizontalAlignment.Left };
+        var box = new TextBox { Text = InitialText(field, parameters), Width = 340, HorizontalAlignment = HorizontalAlignment.Left, Name = FieldName(field) };
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
         var last = box.Text;
         void Flush()
@@ -138,5 +139,14 @@ public static class SchemaForm
         box.LostFocus += (_, _) => Flush();
         box.Unloaded += (_, _) => { if (timer.IsEnabled) Flush(); };
         return box;
+    }
+
+    /// <summary>« param_ » + le nom du champ, assaini en nom WPF valide (lettres, chiffres, tiret bas) — un nom de
+    /// champ de source pourrait contenir un caractère que x:Name refuse.</summary>
+    private static string FieldName(SchemaField field)
+    {
+        var sb = new System.Text.StringBuilder("param_");
+        foreach (var ch in field.Name) sb.Append(ch is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or >= '0' and <= '9' ? ch : '_');
+        return sb.ToString();
     }
 }

@@ -38,10 +38,12 @@ internal static class Bricks
 
     /// <summary>Un champ texte qui rappelle onChange 300 ms après la dernière frappe (et à la perte du focus). Au
     /// démontage, une valeur en attente est validée tout de suite plutôt que perdue ou écrite à l'aveugle après coup
-    /// sur un éditeur qui n'existe plus.</summary>
-    public static TextBox Debounced(string initial, Action<string> onChange, double width = 360)
+    /// sur un éditeur qui n'existe plus. <paramref name="name"/> (facultatif) pose x:Name : PillsPage.ShowEditor()
+    /// s'en sert pour retrouver le même champ dans l'éditeur reconstruit et y rendre le focus.</summary>
+    public static TextBox Debounced(string initial, Action<string> onChange, double width = 360, string? name = null)
     {
         var box = new TextBox { Text = initial, Width = width, HorizontalAlignment = HorizontalAlignment.Left };
+        if (name is { Length: > 0 }) box.Name = name;
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
         var last = initial;
         void Flush() { timer.Stop(); if (box.Text != last) { last = box.Text; onChange(box.Text); } }

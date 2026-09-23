@@ -108,7 +108,7 @@ public sealed class CellEditor : UserControl
     private UIElement DisplaySection()
     {
         var stack = new StackPanel();
-        stack.Children.Add(Row("Libellé", Debounced(_cell.Label ?? "", v => Set(c => { if (v.Length == 0) c.Remove("label"); else c["label"] = v; }))));
+        stack.Children.Add(Row("Libellé", Debounced(_cell.Label ?? "", v => Set(c => { if (v.Length == 0) c.Remove("label"); else c["label"] = v; }), name: "label")));
         stack.Children.Add(Row("Glyph", GlyphGallery.Build(_cell.Glyph, g => Set(c => { if (g is null) c.Remove("glyph"); else c["glyph"] = g; }))));
         if (!_cell.IsGroup)
         {
@@ -116,7 +116,7 @@ public sealed class CellEditor : UserControl
             var refresh = new StackPanel { Orientation = Orientation.Horizontal };
             var known = Refreshes.Any(r => r.Item1 == (_cell.Refresh ?? ""));
             var combo = Combo(Refreshes, known ? _cell.Refresh ?? "" : "", v => Set(c => { if (v.Length == 0) c.Remove("refresh"); else c["refresh"] = v; }));
-            var custom = Debounced(known ? "" : _cell.Refresh ?? "", v => Set(c => { if (v.Trim().Length == 0) c.Remove("refresh"); else c["refresh"] = v.Trim(); }), 100);
+            var custom = Debounced(known ? "" : _cell.Refresh ?? "", v => Set(c => { if (v.Trim().Length == 0) c.Remove("refresh"); else c["refresh"] = v.Trim(); }), 100, "refresh");
             custom.Margin = new Thickness(8, 0, 0, 0);
             refresh.Children.Add(combo); refresh.Children.Add(custom); refresh.Children.Add(Muted("  ou « 90s », « 2h »"));
             stack.Children.Add(Row("Cadence de lecture", refresh));
@@ -127,8 +127,8 @@ public sealed class CellEditor : UserControl
         // variable qui se référence elle-même avant d'être assignée (CS0165).
         TextBox warn = null!, crit = null!;
         CheckBox invert = null!;
-        warn = Debounced(_cell.Thresholds?.Warn?.ToString(CultureInfo.InvariantCulture) ?? "", _ => CommitThresholds(), 90);
-        crit = Debounced(_cell.Thresholds?.Crit?.ToString(CultureInfo.InvariantCulture) ?? "", _ => CommitThresholds(), 90);
+        warn = Debounced(_cell.Thresholds?.Warn?.ToString(CultureInfo.InvariantCulture) ?? "", _ => CommitThresholds(), 90, "warn");
+        crit = Debounced(_cell.Thresholds?.Crit?.ToString(CultureInfo.InvariantCulture) ?? "", _ => CommitThresholds(), 90, "crit");
         invert = new CheckBox { Content = "inversé (bas = mauvais)", IsChecked = _cell.Thresholds?.Invert ?? false, Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         invert.Checked += (_, _) => CommitThresholds(); invert.Unchecked += (_, _) => CommitThresholds();
         thresholds.Children.Add(Muted("avertir à ")); thresholds.Children.Add(warn); thresholds.Children.Add(Muted("  critique à ")); thresholds.Children.Add(crit); thresholds.Children.Add(invert);
@@ -161,7 +161,7 @@ public sealed class CellEditor : UserControl
         // value/kind : même pré-déclaration que warn/crit/invert plus haut, pour la même raison (CS0165).
         TextBox value = null!;
         ComboBox kind = null!;
-        value = Debounced(click?.Open ?? click?.Shell ?? click?.Source ?? "", _ => CommitClick(), 320);
+        value = Debounced(click?.Open ?? click?.Shell ?? click?.Source ?? "", _ => CommitClick(), 320, "click");
         kind = Combo(ClickKinds, current, _ => CommitClick());
         var panel = new StackPanel { Orientation = Orientation.Horizontal };
         value.Margin = new Thickness(8, 0, 0, 0);
@@ -178,10 +178,10 @@ public sealed class CellEditor : UserControl
             {
                 var index = i; var a = list[i];
                 var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2, 0, 2) };
-                row.Children.Add(Debounced(a.Label ?? "", v => { a.Label = v; CommitCard(); }, 140));
+                row.Children.Add(Debounced(a.Label ?? "", v => { a.Label = v; CommitCard(); }, 140, $"act_label_{index}"));
                 var k = Combo(ActionKinds, a.Open is not null ? "open" : a.Shell is not null ? "shell" : "source", v => { var val = a.Open ?? a.Shell ?? a.Source ?? ""; a.Open = a.Shell = a.Source = null; if (v == "open") a.Open = val; else if (v == "shell") a.Shell = val; else a.Source = val; CommitCard(); });
                 k.Margin = new Thickness(8, 0, 0, 0); row.Children.Add(k);
-                var v = Debounced(a.Open ?? a.Shell ?? a.Source ?? "", t => { if (a.Open is not null) a.Open = t; else if (a.Shell is not null) a.Shell = t; else a.Source = t; CommitCard(); }, 220);
+                var v = Debounced(a.Open ?? a.Shell ?? a.Source ?? "", t => { if (a.Open is not null) a.Open = t; else if (a.Shell is not null) a.Shell = t; else a.Source = t; CommitCard(); }, 220, $"act_value_{index}");
                 v.Margin = new Thickness(8, 0, 0, 0); row.Children.Add(v);
                 row.Children.Add(Btn("↑", () => { if (index > 0) { (list[index - 1], list[index]) = (list[index], list[index - 1]); CommitCard(); } }, "GhostButton"));
                 row.Children.Add(Btn("↓", () => { if (index < list.Count - 1) { (list[index + 1], list[index]) = (list[index], list[index + 1]); CommitCard(); } }, "GhostButton"));
@@ -280,6 +280,6 @@ public sealed class CellEditor : UserControl
     private static Grid Row(string label, UIElement field) => Bricks.Row(label, field, 200);
     private static Border Card(UIElement content) => Bricks.Card(content);
     private static ComboBox Combo(IReadOnlyList<(string Value, string Label)> items, string current, Action<string> onChange) => Bricks.Combo(items, current, onChange, 200);
-    private static TextBox Debounced(string initial, Action<string> onChange, double width = 360) => Bricks.Debounced(initial, onChange, width);
+    private static TextBox Debounced(string initial, Action<string> onChange, double width = 360, string? name = null) => Bricks.Debounced(initial, onChange, width, name);
     private static Button Btn(string text, Action click, string style = "Secondary") => Bricks.Btn(text, click, style, 6);
 }

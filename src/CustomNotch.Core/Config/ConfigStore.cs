@@ -15,6 +15,12 @@ public sealed class ConfigStore : IDisposable
     private readonly object _lock = new();
     private System.Threading.Timer? _debounce;
     private bool _disposed;
+    /// <summary>Le texte JSON résolu (placeholders inclus) du dernier chargement réussi. Un ConfigEditor écrit le
+    /// fichier partagé puis recharge tout de suite ; 300 ms plus tard, le FileSystemWatcher détecte ce même écrit
+    /// et redéclenche un rechargement avec un contenu identique — sans ce garde-fou, chaque abonné (page Pilules,
+    /// éditeur de cellule…) reconstruirait son UI pour rien à chaque frappe. Mis à jour seulement sur un
+    /// chargement accepté : un refus entre deux n'y touche pas.</summary>
+    private string? _lastResolvedJson;
 
     public event Action<CellsFile>? Changed;
     public event Action<string>? Rejected;
@@ -71,8 +77,11 @@ public sealed class ConfigStore : IDisposable
                     Rejected?.Invoke(message);
                     return false;
                 }
+                var text = resolved!.ToJsonString(CellsJson.Options);
+                var unchanged = text == _lastResolvedJson;
+                _lastResolvedJson = text;
                 Current = file;
-                Changed?.Invoke(file);
+                if (!unchanged) Changed?.Invoke(file);
                 return true;
             }
             catch (Exception ex)

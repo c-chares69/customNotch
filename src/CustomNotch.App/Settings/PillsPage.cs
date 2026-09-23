@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using CustomNotch.Core.Config;
 
 namespace CustomNotch.App.Settings;
@@ -124,9 +125,16 @@ public sealed class PillsPage : PageBase
         return new ListBoxItem { Content = row, Tag = (kind, id), ToolTip = visible ? null : "masquée sur ce poste" };
     }
 
+    /// <summary>Reconstruit l'éditeur — une instance neuve à chaque fois, même pour la même sélection : c'est ce
+    /// que Refresh() attend (voir sa note). Sans rien de plus, le focus clavier — souvent encore dans le champ dont
+    /// l'anti-rebond vient d'écrire, puisque Changed peut retomber ici pendant que l'utilisateur tape déjà le champ
+    /// suivant — atterrirait nulle part : le curseur quitterait le champ en pleine saisie. On retrouve donc le même
+    /// contrôle (par x:Name, posé par Bricks.Debounced et SchemaForm) dans la nouvelle instance et on lui rend le
+    /// focus, et sa position de caret pour un TextBox.</summary>
     private void ShowEditor()
     {
         var file = Ctx.Store.Current;
+        var (focusName, caret) = CaptureFocus();
         if (_selected is not { } sel)
         {
             _editor.Content = Ui.Text("Choisis une pilule ou une cellule.", 13, null, "Muted");
@@ -147,6 +155,46 @@ public sealed class PillsPage : PageBase
             _editor.Content = cell is null ? null : new CellEditor(Ctx, cell, Try);
             _hide.Content = cell?.Visible == false ? "Afficher" : "Masquer";
         }
+        RestoreFocus(focusName, caret);
+    }
+
+    /// <summary>Le contrôle focalisé, s'il est dans l'éditeur en train d'être remplacé et porte un nom — et sa
+    /// position de caret, pour un TextBox.</summary>
+    private (string? Name, int Caret) CaptureFocus()
+    {
+        if (Keyboard.FocusedElement is FrameworkElement { Name.Length: > 0 } fe && IsInsideEditor(fe))
+            return (fe.Name, fe is TextBox tb ? tb.SelectionStart : 0);
+        return (null, 0);
+    }
+
+    private bool IsInsideEditor(DependencyObject element)
+    {
+        for (DependencyObject? d = element; d is not null; d = LogicalTreeHelper.GetParent(d))
+            if (ReferenceEquals(d, _editor)) return true;
+        return false;
+    }
+
+    private void RestoreFocus(string? name, int caret)
+    {
+        if (name is null) return;
+        // L'arbre logique est déjà complet (Content vient d'être posé), mais Focus() veut un élément visible ;
+        // UpdateLayout() force la passe de mise en page (et l'application des patrons) tout de suite plutôt que
+        // d'attendre le prochain passage du moteur de rendu.
+        _editor.UpdateLayout();
+        if (FindByName(_editor, name) is not FrameworkElement match) return;
+        match.Focus();
+        if (match is TextBox tb) tb.SelectionStart = Math.Min(caret, tb.Text.Length);
+    }
+
+    /// <summary>Cherche par x:Name dans l'arbre logique (posé en code, pas en XAML : rien n'est enregistré dans un
+    /// NameScope, donc FindName ne le trouverait pas) — l'arbre logique existe dès que Content est posé, sans
+    /// attendre qu'un patron de contrôle s'applique.</summary>
+    private static FrameworkElement? FindByName(DependencyObject node, string name)
+    {
+        if (node is FrameworkElement { } fe && fe.Name == name) return fe;
+        foreach (var child in LogicalTreeHelper.GetChildren(node))
+            if (child is DependencyObject d && FindByName(d, name) is { } found) return found;
+        return null;
     }
 
     private string? PillOfSelection()

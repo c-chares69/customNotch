@@ -92,6 +92,25 @@ public class ConfigStoreTests : IDisposable
     }
 
     [Fact]
+    public void Recharger_sans_changement_ne_notifie_pas()
+    {
+        File.WriteAllText(Path.Combine(_home, "cells.json"), """{"pills":[{"id":"only","cells":[{"id":"c","source":"system.cpu","label":"A"}]}]}""");
+        var store = new ConfigStore(_home, Known);
+        var count = 0;
+        store.Changed += _ => count++;
+        Assert.True(store.Load());
+        Assert.Equal(1, count);
+        // Un second chargement du même contenu ne notifie pas : c'est exactement ce que fait le FileSystemWatcher
+        // quand il détecte l'écriture que l'app vient elle-même de faire, 300 ms après coup — sinon chaque abonné
+        // (page Pilules, éditeur de cellule) reconstruirait son UI pour rien, et perdrait le focus en cours.
+        Assert.True(store.Load());
+        Assert.Equal(1, count);
+        File.WriteAllText(store.CellsPath, """{"pills":[{"id":"only","cells":[{"id":"c","source":"system.cpu","label":"B"}]}]}""");
+        Assert.True(store.Load());
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
     public async Task Le_watcher_recharge_apres_une_ecriture()
     {
         using var store = new ConfigStore(_home, Known);
