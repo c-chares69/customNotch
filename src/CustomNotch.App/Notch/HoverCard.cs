@@ -147,7 +147,7 @@ public sealed class HoverCard : Border
         var isTimeline = row.Hint is { } h && h.StartsWith("timeline:", StringComparison.Ordinal);
         UIElement content;
         if (isTimeline && ParseTimeline(row.Hint!, row.Tone) is { } t) content = TimelineContent(t);
-        else if (isTimeline) content = NormalContent(row with { Fraction = null });
+        else if (isTimeline) content = NormalContent(row with { Fraction = null, Hint = null });
         else content = NormalContent(row);
         var wrapper = new Border { Padding = new Thickness(0, 9, 0, 9), Child = content };
         if (!first)
@@ -158,6 +158,10 @@ public sealed class HoverCard : Border
         return wrapper;
     }
 
+    /// <summary>Le gabarit d'une ligne normale : label 14 semi-gras à gauche, texte 13 gris à droite, barre 6 px
+    /// sous les deux si <c>Fraction</c>, et — sauf pour la ligne de timeline, qui pose <c>Hint</c> à null avant
+    /// d'arriver ici — un <c>Hint</c> non nul (11 px, gris, aligné à gauche, marge haute 3) sous la barre, ou sous
+    /// le label s'il n'y en a pas (la carte Système s'en sert : « sur secteur », « reste 1 h 20 »).</summary>
     private static UIElement NormalContent(CardRow row)
     {
         var grid = new Grid();
@@ -184,6 +188,16 @@ public sealed class HoverCard : Border
             track.Child = fill;
             Grid.SetColumnSpan(track, 2); Grid.SetRow(track, 1);
             grid.Children.Add(track);
+        }
+        if (row.Hint is { } hint)
+        {
+            if (grid.RowDefinitions.Count == 0) grid.RowDefinitions.Add(new RowDefinition());
+            grid.RowDefinitions.Add(new RowDefinition());
+            var hintRow = grid.RowDefinitions.Count - 1;
+            var hintText = Text(hint, 11, FontWeights.Normal, "Muted", new Thickness(0, 3, 0, 0));
+            hintText.HorizontalAlignment = HorizontalAlignment.Left;
+            Grid.SetColumnSpan(hintText, 2); Grid.SetRow(hintText, hintRow);
+            grid.Children.Add(hintText);
         }
         return grid;
     }

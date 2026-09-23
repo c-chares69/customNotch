@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -65,21 +66,7 @@ public class ClaudeSourceTests : IDisposable
     private static CellContext Ctx(string cellId = "claude", JsonObject? @params = null) => new(cellId, @params ?? new JsonObject(), null);
 
     [Fact]
-    public async Task Jeton_valide_donne_la_valeur_les_fenetres_et_la_repartition()
-    {
-        var source = Build();
-
-        var reading = await source.ReadAsync(Ctx(), CancellationToken.None);
-
-        Assert.Equal(3, reading.Value);
-        Assert.Equal(100, reading.Max);
-        Assert.Null(reading.Status);
-        Assert.Equal(3, reading.Detail!.Count(d => !d.Label.StartsWith('·')));
-        Assert.Contains(reading.Detail!, d => d.Label == "· Claude Code" && d.Text == "94 %");
-    }
-
-    [Fact]
-    public async Task Une_session_waiting_donne_le_statut_Attention()
+    public async Task Par_defaut_seules_les_fenetres_paraissent_et_le_statut_reste_null_meme_avec_une_session_en_attente()
     {
         var source = Build();
         WriteSession(500, "waiting", _clock, name: "customNotch");
@@ -87,21 +74,75 @@ public class ClaudeSourceTests : IDisposable
 
         var reading = await source.ReadAsync(Ctx(), CancellationToken.None);
 
+        Assert.Equal(3, reading.Value);
+        Assert.Equal(100, reading.Max);
+        Assert.Null(reading.Status);
+        Assert.Equal(3, reading.Detail!.Count);
+        Assert.DoesNotContain(reading.Detail!, d => d.Label.StartsWith('·'));
+        Assert.DoesNotContain(reading.Detail!, d => d.Label == "customNotch");
+    }
+
+    [Fact]
+    public async Task Sessions_true_ajoute_les_lignes_de_session_et_le_statut_Attention()
+    {
+        var source = Build();
+        WriteSession(500, "waiting", _clock, name: "customNotch");
+        _sessions!.Scan();
+
+        var reading = await source.ReadAsync(Ctx(@params: new JsonObject { ["sessions"] = true }), CancellationToken.None);
+
         Assert.Equal(Status.Attention, reading.Status);
         Assert.Contains(reading.Detail!, d => d.Label == "customNotch" && d.Text == "en attente de toi" && d.Tone == Status.Attention);
     }
 
     [Fact]
-    public async Task Une_session_busy_donne_le_statut_Busy()
+    public async Task Sessions_true_donne_le_statut_Busy_avec_une_session_occupee()
     {
         var source = Build();
         WriteSession(501, "busy", _clock, name: "customNotch");
         _sessions!.Scan();
 
-        var reading = await source.ReadAsync(Ctx(), CancellationToken.None);
+        var reading = await source.ReadAsync(Ctx(@params: new JsonObject { ["sessions"] = true }), CancellationToken.None);
 
         Assert.Equal(Status.Busy, reading.Status);
         Assert.Contains(reading.Detail!, d => d.Label == "customNotch" && d.Tone == Status.Busy);
+    }
+
+    [Fact]
+    public async Task Breakdown_true_ajoute_les_lignes_de_repartition_hebdomadaire()
+    {
+        var source = Build();
+
+        var reading = await source.ReadAsync(Ctx(@params: new JsonObject { ["breakdown"] = true }), CancellationToken.None);
+
+        Assert.Contains(reading.Detail!, d => d.Label == "· Claude Code" && d.Text == "94 %");
+    }
+
+    [Fact]
+    public async Task Le_hint_d_une_fenetre_est_la_date_de_reset_en_heure_locale()
+    {
+        var source = Build();
+
+        var reading = await source.ReadAsync(Ctx(), CancellationToken.None);
+
+        var resetsAtMs = DateTimeOffset.Parse("2026-09-23T16:39:59.736361+00:00", CultureInfo.InvariantCulture).ToUnixTimeMilliseconds();
+        var expected = "reset le " + DateTimeOffset.FromUnixTimeMilliseconds(resetsAtMs).ToLocalTime().ToString("dd/MM 'à' HH:mm", CultureInfo.InvariantCulture);
+        Assert.Contains(reading.Detail!, d => d.Hint == expected);
+    }
+
+    [Fact]
+    public async Task Le_repli_sur_les_reglages_globaux_active_sessions_et_breakdown()
+    {
+        var source = Build();
+        WriteSession(502, "waiting", _clock, name: "customNotch");
+        _sessions!.Scan();
+        var globals = new JsonObject { ["sessions"] = true, ["breakdown"] = true };
+
+        var reading = await source.ReadAsync(new CellContext("claude", new JsonObject(), globals), CancellationToken.None);
+
+        Assert.Equal(Status.Attention, reading.Status);
+        Assert.Contains(reading.Detail!, d => d.Label == "customNotch");
+        Assert.Contains(reading.Detail!, d => d.Label == "· Claude Code");
     }
 
     [Fact]

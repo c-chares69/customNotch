@@ -10,7 +10,8 @@ public sealed record CellContext(string CellId, JsonObject Params, JsonObject? G
     public string? Str(string key) => Params[key] is JsonValue v && v.TryGetValue<string>(out var s) && s.Length > 0 ? s
         : Globals?[key] is JsonValue g && g.TryGetValue<string>(out var gs) && gs.Length > 0 ? gs : null;
     public double? Num(string key) => Params[key] is JsonValue v && v.TryGetValue<double>(out var d) ? d : null;
-    public bool Flag(string key, bool fallback = false) => Params[key] is JsonValue v && v.TryGetValue<bool>(out var b) ? b : fallback;
+    public bool Flag(string key, bool fallback = false) => Params[key] is JsonValue v && v.TryGetValue<bool>(out var b) ? b
+        : Globals?[key] is JsonValue g && g.TryGetValue<bool>(out var gb) ? gb : fallback;
 }
 
 /// <summary>Un champ de paramètre : la fenêtre de réglages en fait un formulaire, la validation le vérifie.

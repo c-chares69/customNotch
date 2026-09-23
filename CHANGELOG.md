@@ -2,6 +2,14 @@
 
 ## 0.3.1 - 2026-09-23
 
+- **La carte Claude sur mesure.** Par défaut, elle ne montre plus que la consommation : les
+  fenêtres de limite, avec leur date de reset en petit sous chaque barre (« reset le 26/09 à
+  12:59 », en heure locale). La répartition hebdomadaire par usage et les sessions Claude Code en
+  cours (avec la pastille Occupée / En attente) redeviennent des options de la cellule
+  (`breakdown`, `sessions`), réglables aussi par défaut pour tous les `claude` via
+  `sources.claude` ; la page Réglages → Claude continue de montrer les sessions, elle. Au passage,
+  la carte au survol montre de nouveau les indications en petit sous une ligne (« sur secteur »,
+  « reste 1 h 20 » de la carte Système), une régression du redesign de la 0.2.2.
 - **Mises à jour depuis l'application.** *Réglages → Général → Mises à jour* : vérification
   automatique (case, adresse du manifeste - vide = le dépôt public par défaut -, cadence en
   heures), **Vérifier maintenant**, **Installer** (téléchargement vérifié par empreinte SHA-256

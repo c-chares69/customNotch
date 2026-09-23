@@ -1,3 +1,4 @@
+using System.Globalization;
 using CustomNotch.Core.Model;
 using CoreStatus = CustomNotch.Core.Model.Status;
 
@@ -65,6 +66,10 @@ public sealed class ClaudeSource : SourceBase
         {
             new SchemaField("home", "path", "Dossier .claude (autre compte)", Required: false,
                 Help: "Vide = %USERPROFILE%\\.claude"),
+            new SchemaField("breakdown", "bool", "Répartition hebdomadaire par usage (Claude Code, Chats, Cowork…)",
+                Default: "false"),
+            new SchemaField("sessions", "bool", "Sessions Claude Code en cours (état dans la carte, pastille occupée / en attente)",
+                Default: "false"),
         },
         "claude", "Usage (fenêtres, répartition hebdomadaire) et sessions Claude Code en cours");
 
@@ -83,6 +88,8 @@ public sealed class ClaudeSource : SourceBase
     {
         lock (_lock) _cells.Add(ctx.CellId);
         var dir = ctx.Str("home") ?? ClaudeCredentialsFile.DefaultDir();
+        var showBreakdown = ctx.Flag("breakdown");
+        var showSessions = ctx.Flag("sessions");
         var sessions = _sessions.Current;
         var nowMs = _now();
 
@@ -128,11 +135,11 @@ public sealed class ClaudeSource : SourceBase
         try
         {
             var snapshot = await _usage.FetchAsync(creds.AccessToken, creds.SubscriptionType, ct).ConfigureAwait(false);
-            return Succeed(ctx.CellId, creds, snapshot, sessions, _now());
+            return Succeed(ctx.CellId, creds, snapshot, sessions, _now(), showBreakdown, showSessions);
         }
         catch (UsageException ex)
         {
-            return await HandleFailureAsync(ctx.CellId, ex, dir, creds, sessions, ct).ConfigureAwait(false);
+            return await HandleFailureAsync(ctx.CellId, ex, dir, creds, sessions, showBreakdown, showSessions, ct).ConfigureAwait(false);
         }
     }
 
@@ -152,18 +159,19 @@ public sealed class ClaudeSource : SourceBase
 
     // ---- Assemblage -------------------------------------------------------------------------------------
 
-    private Reading Succeed(string cellId, ClaudeCredentials creds, UsageSnapshot snapshot, IReadOnlyList<ClaudeSession> sessions, long nowMs)
+    private Reading Succeed(string cellId, ClaudeCredentials creds, UsageSnapshot snapshot, IReadOnlyList<ClaudeSession> sessions, long nowMs,
+        bool showBreakdown, bool showSessions)
     {
         lock (_lock) { _failures = 0; _backoffUntilMs = null; }
         Backoff.Save(_backoffPath, null);
-        var reading = BuildReading(snapshot, sessions, nowMs);
+        var reading = BuildReading(snapshot, sessions, nowMs, showBreakdown, showSessions);
         Remember(cellId, reading);
         PublishStatus(creds, snapshot, null, null, sessions);
         return reading;
     }
 
     private async Task<Reading> HandleFailureAsync(string cellId, UsageException ex, string dir, ClaudeCredentials creds,
-        IReadOnlyList<ClaudeSession> sessions, CancellationToken ct)
+        IReadOnlyList<ClaudeSession> sessions, bool showBreakdown, bool showSessions, CancellationToken ct)
     {
         switch (ex.Kind)
         {
@@ -188,7 +196,7 @@ public sealed class ClaudeSource : SourceBase
                     try
                     {
                         var snapshot = await _usage.FetchAsync(reread.AccessToken, reread.SubscriptionType, ct).ConfigureAwait(false);
-                        return Succeed(cellId, reread, snapshot, sessions, _now());
+                        return Succeed(cellId, reread, snapshot, sessions, _now(), showBreakdown, showSessions);
                     }
                     catch (UsageException) { /* retombe sur « Connexion requise » ci-dessous */ }
                 }
@@ -213,25 +221,34 @@ public sealed class ClaudeSource : SourceBase
         }
     }
 
-    /// <summary>Fenêtres puis répartition (libellés préfixés « · ») puis sessions - dans cet ordre, comme la
-    /// carte les montre. <see cref="Reading.Status"/> : Attention si une session attend, Busy si une travaille,
-    /// sinon <c>null</c> (les seuils de l'anneau décident depuis Value/Max).</summary>
-    private static Reading BuildReading(UsageSnapshot snapshot, IReadOnlyList<ClaudeSession> sessions, long nowMs)
+    /// <summary>Fenêtres (toujours) puis répartition (<paramref name="showBreakdown"/>, libellés préfixés « · »)
+    /// puis sessions (<paramref name="showSessions"/>) - dans cet ordre, comme la carte les montre. Le user ne veut
+    /// par défaut que la consommation ; répartition et sessions sont des options de la cellule (ou du réglage
+    /// global <c>sources.claude</c>). <see cref="Reading.Status"/> : Attention si une session attend, Busy si une
+    /// travaille, sinon <c>null</c> (les seuils de l'anneau décident depuis Value/Max) - et toujours <c>null</c>
+    /// quand <paramref name="showSessions"/> est faux, pour que la pastille ne bouge plus avec des sessions que la
+    /// carte ne montre pas.</summary>
+    private static Reading BuildReading(UsageSnapshot snapshot, IReadOnlyList<ClaudeSession> sessions, long nowMs,
+        bool showBreakdown, bool showSessions)
     {
         var headline = UsageParser.Headline(snapshot.Windows);
-        var detail = new List<DetailRow>(snapshot.Windows.Count + snapshot.Breakdown.Count + sessions.Count);
+        var detail = new List<DetailRow>(snapshot.Windows.Count
+            + (showBreakdown ? snapshot.Breakdown.Count : 0) + (showSessions ? sessions.Count : 0));
 
         foreach (var w in snapshot.Windows)
             detail.Add(new DetailRow(w.Label, FormatPercent(w.Percent), Clamp01(w.Percent / 100),
-                w.ResetsAtMs is { } resetsAtMs ? $"reset dans {Countdown(resetsAtMs - nowMs)}" : null));
+                w.ResetsAtMs is { } resetsAtMs ? $"reset le {ResetClock(resetsAtMs)}" : null));
 
-        foreach (var b in snapshot.Breakdown)
-            detail.Add(new DetailRow("· " + b.Label, FormatPercent(b.Percent)));
+        if (showBreakdown)
+            foreach (var b in snapshot.Breakdown)
+                detail.Add(new DetailRow("· " + b.Label, FormatPercent(b.Percent)));
 
-        foreach (var s in sessions)
-            detail.Add(new DetailRow(s.Name, SessionText(s, nowMs), Tone: ToneOf(s.State)));
+        if (showSessions)
+            foreach (var s in sessions)
+                detail.Add(new DetailRow(s.Name, SessionText(s, nowMs), Tone: ToneOf(s.State)));
 
-        var status = sessions.Any(s => s.State == SessionState.Waiting) ? CoreStatus.Attention
+        var status = !showSessions ? (CoreStatus?)null
+            : sessions.Any(s => s.State == SessionState.Waiting) ? CoreStatus.Attention
             : sessions.Any(s => s.State == SessionState.Busy) ? CoreStatus.Busy
             : (CoreStatus?)null;
 
@@ -316,6 +333,11 @@ public sealed class ClaudeSource : SourceBase
 
     private static string Clock(long ms) => DateTimeOffset.FromUnixTimeMilliseconds(ms).ToLocalTime().ToString("HH:mm");
 
+    /// <summary>« 26/09 à 12:59 » en heure locale : le <c>Hint</c> d'une fenêtre de limite (« reset le … »), lu
+    /// directement au lieu d'un décompte qui se périmait dès l'instant suivant.</summary>
+    private static string ResetClock(long ms) =>
+        DateTimeOffset.FromUnixTimeMilliseconds(ms).ToLocalTime().ToString("dd/MM 'à' HH:mm", CultureInfo.InvariantCulture);
+
     /// <summary>« 2 min », « 3 h »… depuis le début d'une session occupée (<see cref="SessionText"/>) - pas de
     /// préfixe, l'appelant pose « depuis » ou « il y a » selon le sens.</summary>
     private static string Elapsed(long ms)
@@ -325,18 +347,5 @@ public sealed class ClaudeSource : SourceBase
         if (seconds < 3600) return $"{seconds / 60} min";
         if (seconds < 86400) return $"{seconds / 3600} h";
         return $"{seconds / 86400} j";
-    }
-
-    /// <summary>« 45 min » sous une heure, « 3 h 12 » sous un jour, « 2 j 22 h » au-delà - ce que montre le
-    /// <c>Hint</c> d'une fenêtre de limite (« reset dans … »).</summary>
-    public static string Countdown(long ms)
-    {
-        var totalMinutes = Math.Max(0, ms) / 60_000;
-        var days = totalMinutes / 1440;
-        var hours = totalMinutes / 60 % 24;
-        var minutes = totalMinutes % 60;
-        if (days > 0) return $"{days} j {hours} h";
-        if (hours > 0) return $"{hours} h {minutes:00}";
-        return $"{minutes} min";
     }
 }
