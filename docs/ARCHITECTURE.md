@@ -347,6 +347,26 @@ renouvellement (`claude -p`, marge 4 min avant expiration, un essai par jeton pu
 doublée par échec, plafonnée à 1 h) ; `TryRenewAsync` relance le CLI (délégué injecté) et juge sur
 l'avancée de `expiresAt` après relecture.
 
+`SessionRegistry` lit le registre que Claude Code tient lui-même dans
+`~/.claude/sessions/<pid>.json` (un fichier par processus CLI, lecture seule). `Scan()` est
+synchrone et ne lève jamais : un fichier illisible ou à moitié écrit est sauté (journalisé au plus
+une fois par nom), un dossier absent (Claude Code jamais lancé) rend une liste vide.
+`SessionRecord.Parse` est tolérant — seuls `pid` et `cwd` sont requis, `name` retombe sur le dernier
+segment de `cwd`. Vivacité : le pid doit exister (délégué `processStartFileTime` injecté) **et**
+son heure de démarrage doit correspondre à celle du fichier — sinon le pid a été recyclé par un
+autre processus entre-temps ; comparaison sur `procStart` (FILETIME Windows, ±2 s en unités 100 ns)
+quand le fichier le donne, sinon repli sur `startedAt` (ms, ±2 s) contre
+`DateTimeOffset.FromFileTime`. Dédoublonnage par `sessionId` (le pid sert de repli), le fichier au
+`startedAt` le plus grand gagnant. Une session qui disparaît (fichier supprimé, processus mort)
+reste visible **10 min** (`EndedKeepMs`, état `Ended`, `SinceMs` = instant de la disparition) avant
+d'être oubliée — « terminée il y a 3 min » plutôt qu'une disparition brutale. `IgnoredPids` (délégué)
+exclut les pids que `TokenRenewal` vient de lancer pour renouveler le jeton : ce ne sont pas des
+sessions de travail. `Start()` arme un `FileSystemWatcher` (rebond 120 ms, comme `ConfigStore`) et
+un tic de **2 s** qui appelle `Scan()` quoi qu'il arrive — nécessaire malgré le watcher pour un
+processus qui meurt sans toucher au dossier, et pour `status` réécrit dans le même fichier sans
+événement fiable ; le tic sert aussi à retenter la création du watcher si le dossier n'existait pas
+encore au démarrage. `Changed` part hors du verrou, seulement quand `Scan()` change le résultat.
+
 ---
 
 ## 6. Fenêtre et rendu

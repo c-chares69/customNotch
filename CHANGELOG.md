@@ -6,6 +6,10 @@
   donne le jeton (jamais journalisé) ; `GET …/oauth/usage` donne les fenêtres de limite (session,
   semaine tous modèles, semaine par modèle) et la répartition hebdomadaire par surface, avec un
   backoff persisté après un 429 et un renouvellement automatique (`claude -p`) avant expiration.
+- **Le registre des sessions Claude Code en cours** (`~/.claude/sessions/<pid>.json`) : vivacité
+  vérifiée par pid et heure de démarrage du processus (le pid n'est pas recyclé), dédoublonnage par
+  session, surveillance par `FileSystemWatcher` + tic de 2 s, et une session terminée reste visible
+  10 min avant de disparaître.
 
 ## 0.2.2 - 2026-09-23
 
