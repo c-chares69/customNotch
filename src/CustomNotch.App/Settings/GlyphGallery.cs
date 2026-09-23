@@ -58,16 +58,21 @@ public static class GlyphGallery
             grid.Children.Add(button);
         }
         stack.Children.Add(grid);
-        var raw = new TextBox { Width = 460, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 6, 0, 0), Text = current is { } c && c.StartsWith('M') ? c : "" };
+        var raw = new TextBox { Name = "svg", Width = 460, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 6, 0, 0), Text = current is { } c && c.StartsWith('M') ? c : "" };
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
-        timer.Tick += (_, _) =>
+        void Flush()
         {
             timer.Stop();
             var t = raw.Text.Trim();
             if (t.Length == 0) { Select(none); onPick(null); }
             else if (t.StartsWith('M')) { Select(null); onPick(t); }
-        };
+        }
+        timer.Tick += (_, _) => Flush();
         raw.TextChanged += (_, _) => { timer.Stop(); timer.Start(); };
+        // Même vidage qu'un champ Bricks.Debounced : au démontage (changement de sélection dans la liste), une
+        // valeur en attente est validée tout de suite plutôt que perdue ou écrite après coup sur une galerie qui
+        // n'existe plus.
+        raw.Unloaded += (_, _) => { if (timer.IsEnabled) Flush(); };
         var hint = Ui.Text("Ou un tracé SVG (commence par M) — grille 16×16 pour un trait, 24×24 pour un plein.", 11, null, "Muted");
         stack.Children.Add(raw);
         stack.Children.Add(hint);

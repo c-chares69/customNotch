@@ -55,7 +55,9 @@ sans assistant (le runtime .NET 10 Desktop doit être présent :
 - enregistre deux tâches planifiées : **customNotch** à l'ouverture de session (relancée
   jusqu'à 3 fois en cas d'échec) et **customNotch Watchdog** toutes les 15 minutes, qui la
   relance si elle s'est arrêtée de façon inattendue. Si tu la quittes toi-même depuis l'icône,
-  le watchdog respecte ce choix jusqu'au prochain lancement volontaire.
+  le watchdog respecte ce choix jusqu'au prochain lancement volontaire. La tâche de session
+  démarre avec `--startup` : comme un lancement manuel, sauf que la copie en trop (les deux
+  tâches peuvent partir ensemble à l'ouverture de session) s'efface sans ouvrir les réglages.
 
 `scripts\package.ps1` produit les trois à la fois : l'installateur, l'archive portable et
 `dist\latest.json`, le manifeste des mises à jour (voir plus bas), qui pointe sur

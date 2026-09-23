@@ -19,7 +19,8 @@ foreach ($name in @($app)) {
 Remove-Item "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\CustomNotch" -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item (Join-Path $dir "uninstall.ps1") -Force -ErrorAction SilentlyContinue
 
-$action = New-ScheduledTaskAction -Execute $Exe -WorkingDirectory $dir
+# --startup : comme un lancement manuel, mais une copie en trop s'efface sans ouvrir les réglages.
+$action = New-ScheduledTaskAction -Execute $Exe -Argument "--startup" -WorkingDirectory $dir
 $logon = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
     -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) `

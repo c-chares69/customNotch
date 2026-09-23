@@ -66,7 +66,8 @@ foreach ($name in @($app)) {
 }
 
 # 5. Tâches planifiées
-$action = New-ScheduledTaskAction -Execute $exe -WorkingDirectory $installDir
+# --startup : comme un lancement manuel, mais une copie en trop s'efface sans ouvrir les réglages.
+$action = New-ScheduledTaskAction -Execute $exe -Argument "--startup" -WorkingDirectory $installDir
 $logon = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
     -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) `

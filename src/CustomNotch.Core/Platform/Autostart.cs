@@ -93,7 +93,8 @@ public static class Autostart
     {
         var script = Path.Combine(AppContext.BaseDirectory, "install_tasks.ps1");
         if (File.Exists(script)) return RunScript(script, "-Exe", Environment.ProcessPath ?? "");
-        var session = Schtasks("/Create", "/TN", TaskName, "/TR", LaunchCommand(), "/SC", "ONLOGON", "/RL", "LIMITED", "/F");
+        // --startup : comme un lancement manuel, mais une copie en trop s'efface sans ouvrir les réglages.
+        var session = Schtasks("/Create", "/TN", TaskName, "/TR", LaunchCommand() + " --startup", "/SC", "ONLOGON", "/RL", "LIMITED", "/F");
         var watchdog = Schtasks("/Create", "/TN", WatchdogName, "/TR", LaunchCommand() + " --auto", "/SC", "MINUTE", "/MO", "15", "/F");
         return session && watchdog;
     }

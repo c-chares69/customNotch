@@ -437,7 +437,10 @@ Même patron que ClickUp-Extended, adapté au nom de l'application (`scripts/`, 
   l'application si elle s'est arrêtée de façon inattendue. `--auto` (la tâche de surveillance)
   ne fait rien si l'application tourne déjà ou si `stopped_by_user` existe — posé par
   « Quitter » depuis le tray, effacé par tout lancement volontaire : un « Quitter » explicite
-  n'est jamais annulé par le watchdog avant le prochain lancement voulu. L'installateur pose le
+  n'est jamais annulé par le watchdog avant le prochain lancement voulu. La tâche de session
+  démarre avec `--startup` : comme un lancement manuel (démarre même après un « Quitter », lève
+  le marqueur), sauf que si elle perd la course à l'ouverture de session contre une autre copie
+  (le watchdog peut partir en même temps), elle s'efface sans ouvrir les réglages. L'installateur pose le
   **runtime .NET 10 Desktop** s'il manque (téléchargé chez Microsoft, une fois par poste) —
   c'est ce qui garde l'application à quelques mégaoctets sans l'embarquer.
 - **Installation silencieuse** : `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART` — c'est ce que la

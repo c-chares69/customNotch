@@ -5,8 +5,9 @@
 #
 # Le jeton GitHub vient de GITHUB_TOKEN / GH_TOKEN, sinon du gestionnaire d'identifiants Git
 # (celui qui sert déjà à pousser) ; il n'est jamais affiché ni écrit. Les notes de la release
-# sont la section correspondante de CHANGELOG.md. Une fois publiée, l'adresse du manifeste
-# pour *Réglages → Général → Mises à jour* est :
+# sont la section correspondante de CHANGELOG.md. Une fois publiée, l'adresse du manifeste des
+# mises à jour est ci-dessous (la vérification depuis l'application, *Réglages → Général →
+# Mises à jour*, arrive dans une prochaine version) :
 #
 #   https://github.com/<owner>/<repo>/releases/latest/download/latest.json
 #
@@ -66,8 +67,9 @@ $missing = $assets | Where-Object { -not (Test-Path $_) } | ForEach-Object { Spl
 if ($missing) { Write-Host "Fichiers manquants dans dist/ : $($missing -join ', ') - lance scripts\package.ps1 d'abord."; exit 1 }
 
 $body = (Get-ReleaseNotes $version) + "`n`n**Installation** : télécharger ``customNotch-$version-setup.exe`` et double-cliquer " +
-    "(aucun droit administrateur ; le runtime .NET 10 Desktop est posé s'il manque). ``latest.json`` est le manifeste des mises à jour : " +
-    "*Réglages → Général → Mises à jour*, adresse ``https://github.com/$owner/$name/releases/latest/download/latest.json``."
+    "(aucun droit administrateur ; le runtime .NET 10 Desktop est posé s'il manque). ``latest.json`` est le manifeste des mises à jour " +
+    "(``https://github.com/$owner/$name/releases/latest/download/latest.json``) ; la vérification depuis l'application " +
+    "(*Réglages → Général → Mises à jour*) arrive dans une prochaine version."
 Write-Host "Release $tag sur $owner/$name : $(($assets | ForEach-Object { Split-Path -Leaf $_ }) -join ', ')"
 if ($DryRun) { Write-Host $body; exit 0 }
 

@@ -28,6 +28,10 @@ public partial class App : Application
         // depuis le menu de l'icône (marqueur stopped_by_user) ou si l'application tourne déjà. Lancée à la
         // main, une seconde copie réveille la première (ses réglages) et s'arrête.
         var auto = e.Args.Contains("--auto");
+        // --startup : la tâche planifiée de session (posée à l'ouverture, en même temps que le watchdog peut
+        // se déclencher). Comme un lancement manuel pour le reste (démarre même après un « Quitter », lève le
+        // marqueur) — sauf perdre la course : la copie en trop ne doit pas ouvrir les réglages toute seule.
+        var startup = e.Args.Contains("--startup");
         if (auto && (SingleInstance.StoppedByUser(home) || SingleInstance.IsRunning(home)))
         {
             Shutdown();
@@ -36,7 +40,7 @@ public partial class App : Application
         _instance = new SingleInstance(home);
         if (!_instance.Acquire())
         {
-            if (!auto) SingleInstance.Ping(home, "show");
+            if (!auto && !startup) SingleInstance.Ping(home, "show");
             Shutdown();
             return;
         }
