@@ -20,6 +20,17 @@
       "visible": true,
       "cells": [
         {
+          // La cellule Claude Code : l'anneau montre la fenêtre de session (5 h), la carte la
+          // répartition hebdomadaire par surface et les sessions en cours (busy / en attente /
+          // inactive / terminée). "home" est facultatif : le dossier ".claude" d'un autre compte
+          // (par défaut %USERPROFILE%\.claude).
+          "id": "claude",
+          "source": "claude",
+          "label": "Claude",
+          "glyph": "claude"
+          // "params": { "home": "D:\\autre-compte\\.claude" }
+        },
+        {
           // Une cellule-groupe : "children" présent fait toujours un groupe, même si "kind" est
           // posé par erreur ailleurs. Son anneau, dans la pilule, montre l'enfant "headline" ;
           // sa carte, au survol, liste tous les enfants avec leur légende et leurs actions.

@@ -292,8 +292,8 @@ c'est ce que `CellHost`/`CellFace` dessinent, et ce que
 
 ## 5. Sources
 
-Les neuf sources livrées avec ce plan (`CoreSources.Build`) ; `claude` (en cours, voir plus bas) et
-`clickup` restent des sous-projets du plan 0.3.0/0.4.0 (§10).
+Les dix sources livrées avec ce plan (`CoreSources.Build`) ; `clickup` reste un sous-projet du
+plan 0.4.0 (§10).
 
 | Source | Params | Cadence par défaut | Lecture | Actions |
 |---|---|---|---|---|
@@ -303,6 +303,7 @@ Les neuf sources livrées avec ce plan (`CoreSources.Build`) ; `claude` (en cour
 | `system.network` | `iface?` (vide = toutes les interfaces actives) | 2 s | `Value` = débit total (Ko/s sous 1 Mo/s, Mo/s au-dessus), `Unit`, `Detail` (↓ réception, ↑ émission), `History` | — |
 | `system.battery` | — | 30 s | `Value` %, `Max` 100 ; `Status.Off` sans batterie ; `Ok` sur secteur, sinon seuils 20 %/10 % inversés ; `Detail` (charge, secteur ou temps restant) | — |
 | `media` | `fallbackOpen` (cible ouverte au clic sans lecture, défaut « spotify: ») | 5 s (+ poussé au changement) | `Text` = « Titre — Artiste » ; `Status.Busy` en lecture, `Off` sans session ; `Detail` = une ligne `position` (temps `m:ss / m:ss`, fraction, hint `timeline:pos:dur:at`) si la session donne une durée ; sans session, une ligne « Lecture : aucune — cliquer ouvre l'application » ; `Image` = la pochette (PNG/JPEG, ≤ 512 Ko), si la session en donne une | `prev`, `toggle` (lecture/pause), `next`, sans libellé, en lecture ; `open` sans session |
+| `claude` | `home?` (dossier `.claude` d'un autre compte, défaut `%USERPROFILE%\.claude`) | 5 min (+ poussé au changement d'une session ou après un renouvellement) | `Value` = % de la fenêtre de session (`UsageParser.Headline`), `Max` 100 ; `Detail` = fenêtres de limite (barre, « reset dans … ») puis répartition hebdomadaire (libellés « · … ») puis sessions (nom, « occupée depuis … » / « en attente de toi » / « inactive » / « terminée il y a … », teinte) ; `Status` Attention si une session attend, Busy si une travaille, sinon `null` (seuils de l'anneau) ; sans jeton, expiré, en backoff ou en panne réseau : `Off` explicite ou dernière lecture périmée avec la raison, jamais un chiffre inventé | `refresh`, `sign-in` (« Se connecter ») |
 | `http` | `url`\*, `method` (GET/POST), `path`, `textPath`, `max?`, `unit?`, `body?`, `headers{}` | 1 min | `Value`/`Text` extraits du JSON par `path`/`textPath` (`JsonPath` minimal : « data.items[0].n ») ; `Max`/`Unit` s'ils sont fournis ; `Detail` d'une ligne | — |
 | `shell` | `command`\*, `parse` (number / json / text), `path?` (si json), `max?`, `unit?`, `timeoutSeconds` (5) | 1 min | selon `parse` : un nombre (+ `Max`/`Unit`), un nœud JSON pointé, ou le texte de sortie (`Detail`) | — |
 | `launcher` | `open`\* | 24 h | `Status.Off`, `Text` = la cible | `open` : ouvre la cible (URL, chemin, application) |
@@ -330,8 +331,7 @@ côté carte (`HoverCard`, §6) à partir de `PositionAtMs`, jamais ici. Sans se
 session sans lecture en cours), `MediaSource.InvokeAsync("toggle"|"open")` ouvre `fallbackOpen`
 (`ActionRunner.Open`, injectable pour les tests) au lieu de ne rien faire.
 
-`claude` (`Core/Sources/Claude/`, pas encore une `ISource` enregistrée — les sessions et la cellule
-`ClaudeSource` arrivent aux tâches suivantes) : `ClaudeCredentialsFile.Read(dir)` lit
+`claude` (`Core/Sources/Claude/`) : `ClaudeCredentialsFile.Read(dir)` lit
 `.credentials.json` (`claudeAiOauth.{accessToken, expiresAt, subscriptionType, rateLimitTier}`), en
 lecture seule, et masque le jeton (`Log.Mask`) avant de le rendre — il n'atteint jamais le journal.
 `UsageClient.FetchAsync` appelle `GET …/oauth/usage` (`Authorization: Bearer`,
@@ -366,6 +366,38 @@ un tic de **2 s** qui appelle `Scan()` quoi qu'il arrive — nécessaire malgré
 processus qui meurt sans toucher au dossier, et pour `status` réécrit dans le même fichier sans
 événement fiable ; le tic sert aussi à retenter la création du watcher si le dossier n'existait pas
 encore au démarrage. `Changed` part hors du verrou, seulement quand `Scan()` change le résultat.
+
+`ClaudeSource : SourceBase` (type `claude`) assemble tout ça en une seule `Reading`, jamais un
+chiffre inventé : elle garde, par id de cellule, la dernière lecture réussie (`_last`), rendue à
+nouveau — marquée périmée (`Reading.AsStale`) avec la raison — sur toute erreur, plutôt qu'une
+cellule vide. `ReadAsync` : (1) `sessions.Current` ; (2) un 429 récent (`Backoff.Load` au
+démarrage) rend la dernière lecture périmée « limite atteinte, nouvel essai à HH:mm » sans retaper
+l'API ; (3) sans jeton (`readCredentials`) → `Status.Off`, texte « Connexion requise », action
+`sign-in` seule ; jeton expiré → un essai de `TokenRenewal.TryRenewAsync()` puis relecture, encore
+expiré → dernière lecture périmée « jeton expiré — lance claude une fois » ; (4)
+`UsageClient.FetchAsync` réussit → `Value`/`Max` de la fenêtre `Headline`, `Detail` = les fenêtres
+(barre, `Hint` « reset dans … », formaté par `Countdown(ms)` — « 45 min », « 3 h 12 », « 2 j 22 h »)
+puis la répartition (libellés préfixés « · ») puis les sessions (nom, « occupée depuis … » /
+« en attente de toi » / « inactive » / « terminée il y a … », teinte Busy/Attention/Off/Off) ;
+`Status` Attention si une session attend, Busy si une travaille, sinon `null` (les seuils de
+l'anneau jugent alors `Value`/`Max`). Erreurs typées de `UsageException` : `RateLimited` écrit le
+backoff (`Backoff.NextMs` sur un compteur d'échecs propre à la source, remis à zéro au premier
+succès) et rend une lecture périmée ; `Unauthorized` relit le fichier une fois (un jeton différent
+retente l'appel), sinon « Connexion requise » ; `NoLimits` → texte « Aucune limite rapportée »,
+`Status.Off` (un état, pas une panne : pas périmée) ; `Network` → dernière lecture périmée avec le
+message de l'exception. `InvokeAsync("refresh")` pousse la cellule ; `("sign-in")` appelle le
+délégué `SignIn` (posé par l'App, plan 4 — absent, l'action ne fait rien). Le constructeur câble
+`sessions.IgnoredPids = () => renewal.LaunchedPids` et pousse, sur `sessions.Changed`, toutes les
+cellules `claude` connues — même patron que `MediaSource`. `Status` (propriété, type
+`ClaudeStatus` : jeton, dernier instantané d'usage — jamais effacé par une erreur passagère —,
+dernière erreur, prochain essai, chemin du CLI, sessions, dernier renouvellement) et l'événement
+`StatusChanged` alimentent la page Réglages → Claude (plan 4) sans qu'elle relise un fichier ou
+refasse un appel réseau. `CoreSources.Build(media, claude)` enregistre l'instance fournie par
+l'App ; `null` (avant le câblage du plan 4, ou dans les tests de configuration) retombe sur une
+instance interne sans délégué réel (CLI introuvable, aucun pid jamais vivant) — le type `claude`
+reste connu de la validation et du catalogue, sa lecture n'est simplement jamais sollicitée tant
+que le contrôleur n'en construit pas une vraie. `DefaultCells` pose la cellule `claude` en tête de
+la pilule par défaut, avant le groupe Système.
 
 ---
 

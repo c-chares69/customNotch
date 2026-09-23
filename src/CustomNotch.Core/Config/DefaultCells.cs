@@ -1,7 +1,8 @@
 namespace CustomNotch.Core.Config;
 
-/// <summary>Le cells.json du premier lancement : une pilule à droite avec le groupe Système (ses enfants masqués : ils
-/// vivent dans la carte du groupe), la lecture en cours, et un lanceur ClickUp. Tout le reste se règle dans Réglages.</summary>
+/// <summary>Le cells.json du premier lancement : une pilule à droite avec la cellule Claude Code, le groupe
+/// Système (ses enfants masqués : ils vivent dans la carte du groupe), la lecture en cours, et un lanceur
+/// ClickUp. Tout le reste se règle dans Réglages.</summary>
 public static class DefaultCells
 {
     public static string Json() => """
@@ -15,6 +16,7 @@ public static class DefaultCells
               "edge": "right",
               "along": 0.5,
               "cells": [
+                { "id": "claude", "source": "claude", "label": "Claude", "glyph": "claude" },
                 { "id": "sys", "label": "Système", "glyph": "cpu", "children": ["cpu", "mem", "disk", "net", "battery"], "headline": "cpu" },
                 { "id": "cpu",     "source": "system.cpu",     "label": "CPU",      "glyph": "cpu",     "refresh": "2s", "visible": false },
                 { "id": "mem",     "source": "system.memory",  "label": "Mémoire",  "glyph": "memory",  "refresh": "5s", "visible": false },

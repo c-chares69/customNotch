@@ -150,12 +150,13 @@ commentaire) : [docs/cells.example.json](docs/cells.example.json).
 | `system.network` | `iface` (facultatif) | débit Ko/s ou Mo/s, historique |
 | `system.battery` | — | anneau %, secteur ou temps restant |
 | `media` | `fallbackOpen` (cible ouverte au clic sans lecture, « spotify: » par défaut) | titre — artiste de ce qui joue, occupée en lecture, position de lecture (dans la carte), actions précédent / lecture-pause / suivant, avec la pochette |
+| `claude` | `home` (facultatif : dossier `.claude` d'un autre compte, par défaut `%USERPROFILE%\.claude`) | anneau = fenêtre de session (5 h) ; carte : toutes les fenêtres de limite avec leur reset, répartition hebdomadaire par surface, sessions Claude Code en cours (occupée / en attente / inactive / terminée) ; **Attention** si une session attend, **Occupée** si une travaille ; actions « Actualiser », « Se connecter » |
 | `http` | `url`, `method`, `path`, `textPath`, `max`, `unit`, `headers`, `body` | valeur ou texte extrait d'une réponse JSON |
 | `shell` | `command`, `parse`, `path`, `max`, `unit`, `timeoutSeconds` | valeur, JSON pointé, ou texte de sortie d'une commande |
 | `launcher` | `open` | rien à lire : un glyph et une action « ouvrir » |
 
 Détail des params de chaque source : [docs/ARCHITECTURE.md §5](docs/ARCHITECTURE.md#5-sources).
-`claude` et `clickup` (usage Claude Code, timer ClickUp) sont des sous-projets du plan 3.
+`clickup` (timer ClickUp) reste un sous-projet du plan 0.4.0.
 
 ## Développement
 

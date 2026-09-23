@@ -46,7 +46,7 @@ public class ConfigEditorTests : IDisposable
         _editor.SetCell("media", c => c["label"] = "Musique");
         Assert.Equal("Musique", _store.Current.Cell("media")!.Label);
         _editor.MoveCell("media", -1);
-        Assert.Equal("media", _store.Current.Pills[0].Cells[5].Id);
+        Assert.Equal("media", _store.Current.Pills[0].Cells[6].Id);
         _editor.RemoveCell("cpu");
         Assert.Null(_store.Current.Cell("cpu"));
         var sys = _store.Current.Cell("sys")!;

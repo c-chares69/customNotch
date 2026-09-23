@@ -21,7 +21,7 @@ public class ConfigStoreTests : IDisposable
         Assert.True(File.Exists(Path.Combine(_home, "cells.json")));
         Assert.Single(store.Current.Pills);
         var main = store.Current.Pills[0];
-        Assert.Equal(new[] { "sys", "cpu", "mem", "disk", "net", "battery", "media", "clickup" }, main.Cells.Select(c => c.Id));
+        Assert.Equal(new[] { "claude", "sys", "cpu", "mem", "disk", "net", "battery", "media", "clickup" }, main.Cells.Select(c => c.Id));
         Assert.Equal(new[] { "cpu", "mem", "disk", "net", "battery" }, store.Current.Cell("sys")!.Children);
         Assert.Equal("cpu", store.Current.Cell("sys")!.Headline);
         Assert.All(new[] { "cpu", "mem", "disk", "net", "battery" }, id => Assert.False(store.Current.Cell(id)!.Visible));

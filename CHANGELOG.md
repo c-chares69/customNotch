@@ -10,6 +10,12 @@
   vérifiée par pid et heure de démarrage du processus (le pid n'est pas recyclé), dédoublonnage par
   session, surveillance par `FileSystemWatcher` + tic de 2 s, et une session terminée reste visible
   10 min avant de disparaître.
+- **La cellule Claude Code, posée par défaut avant le groupe Système.** L'anneau montre la fenêtre
+  de session ; la carte, toutes les fenêtres de limite (avec leur reset), la répartition
+  hebdomadaire par surface et les sessions en cours (« occupée depuis … », « en attente de toi »,
+  « inactive », « terminée il y a … ») ; **Attention** si une session attend, **Occupée** si une
+  travaille. Actions « Actualiser » et « Se connecter » ; une lecture en échec garde la dernière
+  valeur connue, marquée périmée avec la raison — jamais un chiffre inventé.
 
 ## 0.2.2 - 2026-09-23
 

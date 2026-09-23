@@ -31,7 +31,10 @@ public sealed class Controller : IPillHost
     public Controller(string home)
     {
         _home = home;
-        _registry = CoreSources.Build(_media);
+        // ClaudeSource réel (jeton, HTTP, CLI, registre des sessions) posé au plan 4 ; en attendant, le
+        // registre garde le type "claude" connu (validation, catalogue) via l'instance sans délégué réel
+        // de CoreSources.Build.
+        _registry = CoreSources.Build(_media, null);
         _config = new ConfigStore(home, _registry.Schemas);
         _editor = new ConfigEditor(_config, _registry.Schemas);
         _scheduler = new Scheduler(_registry, _readings, () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), Core.Platform.Idle.Ms);
