@@ -178,10 +178,14 @@ public sealed class CellEditor : UserControl
             {
                 var index = i; var a = list[i];
                 var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2, 0, 2) };
-                row.Children.Add(Debounced(a.Label ?? "", v => { a.Label = v; CommitCard(); }, 140, $"act_label_{index}"));
+                // Label et valeur : la ligne montre déjà ce que l'utilisateur tape, donc CommitCard(rebuild: false)
+                // — reconstruire ici démonterait le TextBox en pleine frappe (nouvelle instance, focus perdu) pour
+                // un résultat visuellement identique. Seul ce qui change la forme des lignes (genre, ordre,
+                // ajout/suppression) reconstruit.
+                row.Children.Add(Debounced(a.Label ?? "", v => { a.Label = v; CommitCard(rebuild: false); }, 140, $"act_label_{index}"));
                 var k = Combo(ActionKinds, a.Open is not null ? "open" : a.Shell is not null ? "shell" : "source", v => { var val = a.Open ?? a.Shell ?? a.Source ?? ""; a.Open = a.Shell = a.Source = null; if (v == "open") a.Open = val; else if (v == "shell") a.Shell = val; else a.Source = val; CommitCard(); });
                 k.Margin = new Thickness(8, 0, 0, 0); row.Children.Add(k);
-                var v = Debounced(a.Open ?? a.Shell ?? a.Source ?? "", t => { if (a.Open is not null) a.Open = t; else if (a.Shell is not null) a.Shell = t; else a.Source = t; CommitCard(); }, 220, $"act_value_{index}");
+                var v = Debounced(a.Open ?? a.Shell ?? a.Source ?? "", t => { if (a.Open is not null) a.Open = t; else if (a.Shell is not null) a.Shell = t; else a.Source = t; CommitCard(rebuild: false); }, 220, $"act_value_{index}");
                 v.Margin = new Thickness(8, 0, 0, 0); row.Children.Add(v);
                 row.Children.Add(Btn("↑", () => { if (index > 0) { (list[index - 1], list[index]) = (list[index], list[index - 1]); CommitCard(); } }, "GhostButton"));
                 row.Children.Add(Btn("↓", () => { if (index < list.Count - 1) { (list[index + 1], list[index]) = (list[index], list[index + 1]); CommitCard(); } }, "GhostButton"));
@@ -212,7 +216,10 @@ public sealed class CellEditor : UserControl
             });
         }
 
-        void CommitCard()
+        // rebuild = false pour une simple saisie (label, valeur) : la ligne éditée montre déjà le bon texte, nul
+        // besoin de la redémonter. rebuild = true (par défaut) pour tout ce qui change la forme des lignes —
+        // genre (kind), ordre (↑/↓), ajout/suppression — où la liste affichée doit vraiment changer.
+        void CommitCard(bool rebuild = true)
         {
             Set(c =>
             {
@@ -227,7 +234,7 @@ public sealed class CellEditor : UserControl
                 }).ToArray());
                 if (actions.Count == 0) c.Remove("actions");
             });
-            Render();
+            if (rebuild) Render();
         }
     }
 
