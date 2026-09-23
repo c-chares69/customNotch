@@ -28,8 +28,18 @@ public sealed class ConfigEditor
 
     // ---- documents --------------------------------------------------------------------------------------------
 
+    /// <summary>Un fichier verrouillé par un autre processus se lit aussi mal qu'il s'écrit mal : IOException et
+    /// UnauthorizedAccessException deviennent un ConfigException, comme un JSON malformé — jamais une exception brute
+    /// qui traverse l'éditeur.</summary>
     private JsonObject Shared()
-        => File.Exists(_store.CellsPath) ? CellsJson.Parse(File.ReadAllText(_store.CellsPath)) : new JsonObject { ["version"] = 1, ["pills"] = new JsonArray() };
+    {
+        if (!File.Exists(_store.CellsPath)) return new JsonObject { ["version"] = 1, ["pills"] = new JsonArray() };
+        try { return CellsJson.Parse(File.ReadAllText(_store.CellsPath)); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new ConfigException($"cells.json illisible (fichier verrouillé ?) : {ex.Message}", ex);
+        }
+    }
 
     private JsonObject Local()
     {
@@ -71,21 +81,26 @@ public sealed class ConfigEditor
             if (!set.Contains($"{basis}-{i}")) return $"{basis}-{i}";
     }
 
-    /// <summary>Écrit le partagé et recharge ; si la config est refusée, remet l'ancien texte et lève.</summary>
+    /// <summary>Écrit le partagé et recharge ; si la config est refusée, remet l'ancien texte (ou efface le fichier s'il
+    /// n'existait pas avant) et lève. Une écriture impossible (fichier verrouillé) échoue tout de suite : jamais un
+    /// appelant qui croit avoir réussi alors que rien n'a été écrit.</summary>
     private void CommitShared(JsonObject root)
     {
         var before = File.Exists(_store.CellsPath) ? File.ReadAllText(_store.CellsPath) : null;
-        Json.WriteAtomic(_store.CellsPath, Header + root.ToJsonString(CellsJson.Options), "config");
+        if (!Json.WriteAtomic(_store.CellsPath, Header + root.ToJsonString(CellsJson.Options), "config"))
+            throw new ConfigException("cells.json n'a pas pu être écrit (fichier verrouillé ?)");
         if (_store.Load()) return;
         var message = string.Join(" ; ", _store.LastErrors);
         if (before is not null) Json.WriteAtomic(_store.CellsPath, before, "config");
-        _store.Load();
+        else File.Delete(_store.CellsPath);
+        if (!_store.Load()) message += " (et le retour arrière a échoué : vérifier cells.json)";
         throw new ConfigException(message);
     }
 
     private void CommitLocal(JsonObject root)
     {
-        Json.WriteAtomic(_store.LocalPath, Json.Format(root), "config");
+        if (!Json.WriteAtomic(_store.LocalPath, Json.Format(root), "config"))
+            throw new ConfigException("cells.<machine>.json n'a pas pu être écrit (fichier verrouillé ?)");
         if (!_store.Load()) throw new ConfigException(string.Join(" ; ", _store.LastErrors));
     }
 
@@ -232,14 +247,14 @@ public sealed class ConfigEditor
 
     public void SetSecret(string name, string value)
     {
-        _store.Secrets.Set(name, value);
-        _store.Load();
+        if (!_store.Secrets.Set(name, value)) throw new ConfigException("secrets.json n'a pas pu être écrit (fichier verrouillé ?)");
+        if (!_store.Load()) throw new ConfigException(string.Join(" ; ", _store.LastErrors));
     }
 
     public void RemoveSecret(string name)
     {
-        _store.Secrets.Remove(name);
-        _store.Load();
+        if (!_store.Secrets.Remove(name)) throw new ConfigException("secrets.json n'a pas pu être écrit (fichier verrouillé ?)");
+        if (!_store.Load()) throw new ConfigException(string.Join(" ; ", _store.LastErrors));
     }
 
     public void SetSourceGlobal(string sourceType, Action<JsonObject> mutate)

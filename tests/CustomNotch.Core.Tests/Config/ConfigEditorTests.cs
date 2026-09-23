@@ -111,4 +111,20 @@ public class ConfigEditorTests : IDisposable
         _editor.SetSourceGlobal("http", g => g["timeoutSeconds"] = 30);
         Assert.Equal(30, _store.Current.Sources!["http"]!["timeoutSeconds"]!.GetValue<int>());
     }
+
+    [Fact]
+    public void Un_fichier_verrouille_fait_echouer_l_operation_au_lieu_de_l_ignorer()
+    {
+        using var lockHandle = new FileStream(_store.CellsPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        Assert.Throws<ConfigException>(() => _editor.AddPill("left"));
+        Assert.Single(_store.Current.Pills);
+    }
+
+    [Fact]
+    public void Un_secret_verrouille_leve()
+    {
+        _editor.SetSecret("a", "b");
+        using var lockHandle = new FileStream(Paths.SecretsFile(_home), FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        Assert.Throws<ConfigException>(() => _editor.SetSecret("a", "c"));
+    }
 }
