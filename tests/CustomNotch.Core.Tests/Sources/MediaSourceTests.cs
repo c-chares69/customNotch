@@ -48,7 +48,16 @@ public class MediaSourceTests
         var r2 = await new MediaSource(null).ReadAsync(Ctx(), CancellationToken.None);
         Assert.Equal(Status.Off, r1.Status);
         Assert.Equal("Aucune lecture", r1.Text);
+        Assert.Equal("aucune — cliquer ouvre Spotify", r1.Detail!.Single().Text);
         Assert.Equal(Status.Off, r2.Status);
+    }
+
+    [Fact]
+    public async Task La_ligne_sans_lecture_nomme_la_cible_du_repli()
+    {
+        var ps = new JsonObject { ["fallbackOpen"] = "https://open.spotify.com/track/1" };
+        var r = await new MediaSource(new FakeSession()).ReadAsync(new CellContext("m", ps, null), CancellationToken.None);
+        Assert.Equal("aucune — cliquer ouvre open.spotify.com", r.Detail!.Single().Text);
     }
 
     [Fact]
@@ -160,5 +169,34 @@ public class MediaSourceTests
 
         var c = new MediaState("t", "a", "app", true, new byte[] { 1, 2, 4 });
         Assert.NotEqual(a, c);
+    }
+
+    [Fact]
+    public void SameExceptPosition_ignore_seulement_la_position()
+    {
+        for (var pos = 0L; pos < 10; pos++)
+        {
+            var a = new MediaState("t", "a", "app", true, PositionMs: pos * 1000, DurationMs: 300_000, PositionAtMs: 1_000_000 + pos * 1000);
+            var b = new MediaState("t", "a", "app", true, PositionMs: pos * 1000 + 1, DurationMs: 300_000, PositionAtMs: 1_000_001 + pos * 1000);
+            Assert.True(MediaState.SameExceptPosition(a, b));
+        }
+
+        var playing = new MediaState("t", "a", "app", true, PositionMs: 1000, DurationMs: 300_000, PositionAtMs: 1_000_000);
+        var paused = playing with { Playing = false };
+        Assert.False(MediaState.SameExceptPosition(playing, paused));
+
+        Assert.False(MediaState.SameExceptPosition(null, playing));
+        Assert.False(MediaState.SameExceptPosition(playing, null));
+    }
+
+    [Fact]
+    public async Task Une_session_en_pause_bascule_sans_ouvrir_l_application()
+    {
+        var opened = new List<string>();
+        var session = new FakeSession { State = new MediaState("Titre", "Artiste", "app", false) };
+        var src = new MediaSource(session, open: t => { opened.Add(t); return true; });
+        await src.InvokeAsync("toggle", Ctx(), CancellationToken.None);
+        Assert.Equal(new[] { "toggle" }, session.Calls);
+        Assert.Empty(opened);
     }
 }

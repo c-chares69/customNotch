@@ -13,6 +13,20 @@ public sealed record MediaState(string Title, string Artist, string App, bool Pl
         && PositionMs == other.PositionMs && DurationMs == other.DurationMs && PositionAtMs == other.PositionAtMs
         && ((Cover is null && other.Cover is null) || (Cover is not null && other.Cover is not null && Cover.AsSpan().SequenceEqual(other.Cover)));
     public override int GetHashCode() => HashCode.Combine(Title, Artist, App, Playing, Cover?.Length ?? 0, PositionMs, DurationMs, PositionAtMs);
+
+    /// <summary>Deux états sont « pareils » ici s'ils ne diffèrent que par la position de lecture (PositionMs,
+    /// PositionAtMs) — tout le reste (titre, artiste, appli, lecture, pochette, durée) doit être identique.
+    /// Contrairement à <see cref="Equals(MediaState?)"/> (qui compare tout, position comprise, et sert aux tests
+    /// comme à l'égalité normale des records), ceci sert à décider quand prévenir l'interface : la position avance
+    /// sans arrêt tant que ça joue, la reconstituer à chaque tic n'est pas un changement qui mérite de reconstruire
+    /// la carte.</summary>
+    public static bool SameExceptPosition(MediaState? a, MediaState? b)
+    {
+        if (a is null && b is null) return true;
+        if (a is null || b is null) return false;
+        return a.Title == b.Title && a.Artist == b.Artist && a.App == b.App && a.Playing == b.Playing && a.DurationMs == b.DurationMs
+            && ((a.Cover is null && b.Cover is null) || (a.Cover is not null && b.Cover is not null && a.Cover.AsSpan().SequenceEqual(b.Cover)));
+    }
 }
 
 /// <summary>La session média du système, vue de Core : lire l'état, agir, et prévenir. L'implémentation (WinRT) vit dans

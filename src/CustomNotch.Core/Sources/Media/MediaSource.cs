@@ -39,14 +39,41 @@ public sealed class MediaSource : SourceBase
     /// <summary>« 2:31 » : minutes sans zéro devant, secondes sur deux chiffres.</summary>
     private static string Clock(long ms) => $"{ms / 60000}:{ms / 1000 % 60:00}";
 
+    /// <summary>Un nom lisible pour la cible du clic sans lecture : « spotify: » → « Spotify » (le nom du schéma,
+    /// majuscule initiale, sans le « : ») ; une URL → son hôte (« open.spotify.com ») ; un chemin de fichier → son
+    /// nom de fichier. Jamais d'exception sur une cible mal formée — au pire, la cible telle quelle.</summary>
+    private static string AppLabel(string target)
+    {
+        var scheme = target.IndexOf("://", StringComparison.Ordinal);
+        if (scheme < 0)
+        {
+            var colon = target.IndexOf(':');
+            if (colon > 0 && colon == target.Length - 1)
+                return char.ToUpperInvariant(target[0]) + target[1..colon];
+            return FileName(target);
+        }
+        var host = target[(scheme + 3)..].Split('/', 2)[0];
+        return host.Length > 0 ? host : FileName(target);
+    }
+
+    private static string FileName(string target)
+    {
+        var trimmed = target.TrimEnd('/', '\\');
+        var i = trimmed.LastIndexOfAny(new[] { '/', '\\' });
+        return i >= 0 && i + 1 < trimmed.Length ? trimmed[(i + 1)..] : trimmed;
+    }
+
     public override Task<Reading> ReadAsync(CellContext ctx, CancellationToken ct)
     {
         lock (_lock) _cells.Add(ctx.CellId);
         var state = _session?.Current();
         if (state is null)
+        {
+            var fallbackOpen = ctx.Str("fallbackOpen") ?? DefaultFallback;
             return Task.FromResult(new Reading(Text: "Aucune lecture", Status: Status.Off,
-                Detail: new[] { new DetailRow("Lecture", "aucune — cliquer ouvre l'application") },
+                Detail: new[] { new DetailRow("Lecture", $"aucune — cliquer ouvre {AppLabel(fallbackOpen)}") },
                 Actions: new[] { new ActionSpec("open", "Ouvrir", "open") }));
+        }
         var text = state.Artist.Length > 0 ? $"{state.Title} — {state.Artist}" : state.Title;
         // La position va dans Detail sous une forme dédiée (label « position », Hint « timeline:… ») : elle ne
         // doit jamais faire un anneau sur la pilule (Value/Max resteraient null), seule la carte la lit.

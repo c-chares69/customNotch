@@ -64,7 +64,9 @@ public sealed class WindowsMediaSession : IMediaSession, IDisposable
             {
                 _onProps = (_, _) => _ = RefreshAsync();
                 _onPlayback = (_, _) => _ = RefreshAsync();
-                _onTimeline = (_, _) => _ = RefreshAsync();
+                // Seule la timeline a changé (la position, ~1 Hz chez les navigateurs) : pas la peine de relire la
+                // pochette à chaque tic, RefreshAsync(timelineOnly: true) la garde telle quelle.
+                _onTimeline = (_, _) => _ = RefreshAsync(timelineOnly: true);
                 session.MediaPropertiesChanged += _onProps;
                 session.PlaybackInfoChanged += _onPlayback;
                 session.TimelinePropertiesChanged += _onTimeline;
@@ -73,7 +75,11 @@ public sealed class WindowsMediaSession : IMediaSession, IDisposable
         _ = RefreshAsync();
     }
 
-    private async Task RefreshAsync()
+    /// <summary><paramref name="timelineOnly"/> : vrai quand seul TimelinePropertiesChanged a déclenché ce
+    /// rafraîchissement (la position, republiée environ chaque seconde par les navigateurs) — la pochette n'a
+    /// alors aucune raison d'avoir changé, la relire (et la faire décoder côté interface) à chaque tic serait du
+    /// travail pour rien ; on garde celle de l'état courant telle quelle.</summary>
+    private async Task RefreshAsync(bool timelineOnly = false)
     {
         GlobalSystemMediaTransportControlsSession? session;
         lock (_lock) session = _session;
@@ -83,11 +89,19 @@ public sealed class WindowsMediaSession : IMediaSession, IDisposable
             var props = await session.TryGetMediaPropertiesAsync();
             var playing = session.GetPlaybackInfo()?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
             var title = props?.Title ?? "";
-            var cover = await ReadThumbnailAsync(props?.Thumbnail);
-            // Même pochette qu'avant (lecture/pause sur la même piste) : on garde l'ancien tableau, pour que
-            // l'interface, qui met en cache l'image décodée par référence, ne la redécode pas à chaque bascule.
-            var previous = Current()?.Cover;
-            if (cover is not null && previous is not null && previous.AsSpan().SequenceEqual(cover)) cover = previous;
+            byte[]? cover;
+            if (timelineOnly)
+            {
+                cover = Current()?.Cover;
+            }
+            else
+            {
+                cover = await ReadThumbnailAsync(props?.Thumbnail);
+                // Même pochette qu'avant (lecture/pause sur la même piste) : on garde l'ancien tableau, pour que
+                // l'interface, qui met en cache l'image décodée par référence, ne la redécode pas à chaque bascule.
+                var previous = Current()?.Cover;
+                if (cover is not null && previous is not null && previous.AsSpan().SequenceEqual(cover)) cover = previous;
+            }
             var (posMs, durMs, atMs) = ReadTimeline(session);
             Set(title.Length == 0
                 ? null
@@ -149,14 +163,21 @@ public sealed class WindowsMediaSession : IMediaSession, IDisposable
         return s.Length > 0 ? s : "média";
     }
 
+    /// <summary>L'état est toujours mémorisé (Current() doit rendre la dernière position connue), mais Changed
+    /// n'est levé que si autre chose que la position a bougé (<see cref="MediaState.SameExceptPosition"/>) : la
+    /// position avance sans arrêt tant que ça joue (TimelinePropertiesChanged, ~1 Hz chez les navigateurs) et
+    /// l'égalité de record la compare — sans ce filtre, chaque tic republiait Changed, l'ordonnanceur relisait la
+    /// cellule et la carte ouverte se reconstruisait chaque seconde. La carte reconstitue elle-même l'avance de la
+    /// position localement (PositionAtMs), elle n'a pas besoin d'être prévenue pour ça.</summary>
     private void Set(MediaState? state)
     {
+        bool changed;
         lock (_lock)
         {
-            if (Equals(state, _state)) return;
+            changed = !MediaState.SameExceptPosition(state, _state);
             _state = state;
         }
-        Changed?.Invoke();
+        if (changed) Changed?.Invoke();
     }
 
     public MediaState? Current() { lock (_lock) return _state; }
