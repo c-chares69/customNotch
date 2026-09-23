@@ -137,6 +137,18 @@ public class ConfigEditorTests : IDisposable
     }
 
     [Fact]
+    public void Un_fichier_local_illisible_n_est_pas_ecrase()
+    {
+        // Verrouillé pendant une synchronisation : rien ne doit être écrit, sinon un document neuf effacerait
+        // les positions de toutes les autres pilules dès que le verrou tombe.
+        _editor.SetPillLocal("main", p => p["along"] = 0.7);
+        var before = File.ReadAllText(_store.LocalPath);
+        using (new FileStream(_store.LocalPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            Assert.Throws<ConfigException>(() => _editor.SetPillLocal("main", p => p["along"] = 0.2));
+        Assert.Equal(before, File.ReadAllText(_store.LocalPath));
+    }
+
+    [Fact]
     public void Retirer_un_secret_indispensable_est_annule()
     {
         // Un lanceur dont le champ requis « open » ne vit que par un secret : le retirer laisserait un

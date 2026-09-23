@@ -41,14 +41,24 @@ public sealed class GeneralPage : PageBase
         var revertingAutostart = false;
         _autostart.Checked += (_, _) => OnAutostartToggled(true);
         _autostart.Unchecked += (_, _) => OnAutostartToggled(false);
+        // schtasks / le script de l'installateur peuvent prendre quelques secondes : la case se grise le temps de
+        // l'opération plutôt que de figer la fenêtre, et reflète l'état réel à la fin.
         void OnAutostartToggled(bool enabled)
         {
             if (revertingAutostart) return;
-            if (Autostart.SetEnabled(enabled)) { _autostartError.Visibility = Visibility.Collapsed; return; }
-            revertingAutostart = true;
-            _autostart.IsChecked = Autostart.IsEnabled();
-            revertingAutostart = false;
-            _autostartError.Visibility = Visibility.Visible;
+            _autostart.IsEnabled = false;
+            _ = Task.Run(() => Autostart.SetEnabled(enabled)).ContinueWith(t => Dispatcher.BeginInvoke(() =>
+            {
+                var ok = t.Status == TaskStatus.RanToCompletion && t.Result;
+                if (!ok)
+                {
+                    revertingAutostart = true;
+                    _autostart.IsChecked = Autostart.IsEnabled();
+                    revertingAutostart = false;
+                }
+                _autostartError.Visibility = ok ? Visibility.Collapsed : Visibility.Visible;
+                _autostart.IsEnabled = true;
+            }));
         }
         var theme = Combo(Themes, ctx.Store.App.GetString("appearance.theme", "system"), v =>
         {

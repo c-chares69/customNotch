@@ -151,11 +151,17 @@ public sealed class ConfigStore : IDisposable
         lock (_lock)
         {
             JsonObject root;
-            // JSON malformé ou fichier verrouillé (IOException/UnauthorizedAccessException) : on repart d'un
-            // document vide plutôt que de laisser une exception brute sortir d'ici. L'écriture qui suit échoue
-            // alors elle-même proprement (WriteAtomic rend false), et c'est ce que l'appelant voit.
+            // Fichier verrouillé ou inaccessible (synchronisation cloud, antivirus) : on n'écrit RIEN. Repartir d'un
+            // document vide puis écrire dès que le verrou tombe effacerait les positions de toutes les autres
+            // pilules ; l'appelant voit un refus et retentera. Seul un JSON malformé (déjà illisible, donc déjà
+            // perdu pour Load) est remplacé par un document neuf.
             try { root = File.Exists(LocalPath) ? CellsJson.Parse(File.ReadAllText(LocalPath)) : new JsonObject(); }
-            catch (Exception ex) when (ex is ConfigException or IOException or UnauthorizedAccessException) { root = new JsonObject(); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Log.Warning("config", $"surcharge locale illisible, rien d'écrit : {ex.Message}");
+                return false;
+            }
+            catch (ConfigException) { root = new JsonObject(); }
             if (root["pills"] is not JsonArray pills) root["pills"] = pills = new JsonArray();
             var pill = pills.OfType<JsonObject>().FirstOrDefault(p => p["id"]?.GetValue<string>() == pillId);
             if (pill is null) pills.Add(pill = new JsonObject { ["id"] = pillId });
