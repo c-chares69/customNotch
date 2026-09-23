@@ -23,18 +23,22 @@ public sealed class TokenRenewal(Func<ClaudeCredentials?> read, Func<string?> fi
     public const long CooldownCapMs = 3_600_000;
 
     private readonly List<int> _launchedPids = new();
+    /// <summary>Un seul renouvellement à la fois : plusieurs cellules claude partagent cette instance et chacune a sa
+    /// propre boucle d'ordonnanceur ; sans ce verrou, deux boucles arrivant au même tic passeraient toutes deux
+    /// ShouldRenew et lanceraient deux `claude -p` — « un essai par jeton » ne tiendrait plus.</summary>
+    private readonly SemaphoreSlim _running = new(1, 1);
     private long? _attemptedForMs;
     private long? _lastAttemptMs;
     private int _failures;
 
     /// <summary>Les pids lancés pour un renouvellement : <c>SessionRegistry.IgnoredPids</c> s'en sert pour ne
     /// pas les compter comme des sessions Claude Code de l'utilisateur.</summary>
-    public IReadOnlyCollection<int> LaunchedPids => _launchedPids;
+    public IReadOnlyCollection<int> LaunchedPids { get { lock (_launchedPids) return _launchedPids.ToArray(); } }
     public string? CliPath { get; private set; }
 
     /// <summary>À passer comme callback « launched » du <c>runHidden</c> fourni par l'App (<c>ClaudeCli.RunHiddenAsync</c>) :
     /// le pid rejoint <see cref="LaunchedPids"/> sans que TokenRenewal connaisse la façon dont le processus est lancé.</summary>
-    public void NoteLaunched(int pid) => _launchedPids.Add(pid);
+    public void NoteLaunched(int pid) { lock (_launchedPids) _launchedPids.Add(pid); }
 
     /// <summary>Pur : pas de jeton → non ; hors marge → non ; jeton déjà tenté → non tant que le cooldown
     /// (doublé par échec, plafonné) n'est pas écoulé ; sinon oui.</summary>
@@ -50,6 +54,13 @@ public sealed class TokenRenewal(Func<ClaudeCredentials?> read, Func<string?> fi
     }
 
     public async Task<RenewalOutcome> TryRenewAsync()
+    {
+        if (!await _running.WaitAsync(0)) return RenewalOutcome.Idle;
+        try { return await RenewLockedAsync(); }
+        finally { _running.Release(); }
+    }
+
+    private async Task<RenewalOutcome> RenewLockedAsync()
     {
         var before = read();
         var nowMs = now();
