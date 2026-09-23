@@ -12,6 +12,7 @@ public sealed class GeneralPage : PageBase
     private static readonly (string, string)[] Themes = { ("system", "Automatique (suit Windows)"), ("light", "Clair"), ("dark", "Sombre") };
     private readonly TextBox _cellsPath;
     private readonly CheckBox _autostart = new() { Content = "Lancer customNotch à l'ouverture de session" };
+    private readonly TextBlock _autostartError = Ui.Text("Impossible de modifier le démarrage automatique.", 11, null, "Muted");
 
     public GeneralPage(SettingsContext ctx) : base(ctx, "Général", "L'emplacement de la configuration, le démarrage, le thème.")
     {
@@ -33,9 +34,22 @@ public sealed class GeneralPage : PageBase
         Body.Children.Add(Section("Configuration"));
         Body.Children.Add(Card(Stack(Row("Fichier cells.json", pathRow), hint)));
 
+        _autostartError.Visibility = Visibility.Collapsed;
         _autostart.IsChecked = Autostart.IsEnabled();
-        _autostart.Checked += (_, _) => Autostart.SetEnabled(true);
-        _autostart.Unchecked += (_, _) => Autostart.SetEnabled(false);
+        // SetEnabled peut échouer (script introuvable, tâche verrouillée…) : la case reflète alors l'état réel,
+        // pas le clic — remise en place sans redéclencher Checked/Unchecked (sinon boucle infinie).
+        var revertingAutostart = false;
+        _autostart.Checked += (_, _) => OnAutostartToggled(true);
+        _autostart.Unchecked += (_, _) => OnAutostartToggled(false);
+        void OnAutostartToggled(bool enabled)
+        {
+            if (revertingAutostart) return;
+            if (Autostart.SetEnabled(enabled)) { _autostartError.Visibility = Visibility.Collapsed; return; }
+            revertingAutostart = true;
+            _autostart.IsChecked = Autostart.IsEnabled();
+            revertingAutostart = false;
+            _autostartError.Visibility = Visibility.Visible;
+        }
         var theme = Combo(Themes, ctx.Store.App.GetString("appearance.theme", "system"), v =>
         {
             ctx.Store.App.Set("appearance.theme", v);
@@ -43,7 +57,7 @@ public sealed class GeneralPage : PageBase
             Theme.Apply(Application.Current, ctx.Store.App);
         });
         Body.Children.Add(Section("Poste"));
-        Body.Children.Add(Card(Stack(Row("Démarrage", _autostart), Row("Thème des fenêtres", theme))));
+        Body.Children.Add(Card(Stack(Row("Démarrage", _autostart), _autostartError, Row("Thème des fenêtres", theme))));
 
         var journal = Btn("Ouvrir le journal", () => { if (Log.Directory is { } d) ActionRunner.Open(d); });
         var repo = Btn("Le dépôt sur GitHub", () => ActionRunner.Open("https://github.com/c-chares69/customNotch"), "GhostButton");
