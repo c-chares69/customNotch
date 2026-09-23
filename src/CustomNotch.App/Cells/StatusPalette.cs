@@ -10,7 +10,6 @@ public static class StatusPalette
     public static readonly Color Track = System.Windows.Media.Color.FromRgb(0x30, 0x30, 0x30);
     public static readonly Color Ink = System.Windows.Media.Color.FromRgb(0xe8, 0xe8, 0xea);
     public static readonly Color Dim = System.Windows.Media.Color.FromRgb(0x80, 0x80, 0x80);
-    public static readonly Color CardBg = System.Windows.Media.Color.FromRgb(0x0a, 0x0a, 0x0a);
 
     public static Color Color(Status status) => status switch
     {

@@ -33,7 +33,7 @@ public sealed class PillWindow : Window
     {
         _host = host;
         Pill = pill;
-        _m = new PillMetrics(pill.Scale);
+        _m = new PillMetrics(pill.Scale, host.Appearance.CardScale);
         Title = $"customNotch - {pill.Id}";
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
@@ -95,7 +95,7 @@ public sealed class PillWindow : Window
     public void Apply(PillConfig pill)
     {
         Pill = pill;
-        _m = new PillMetrics(pill.Scale);
+        _m = new PillMetrics(pill.Scale, _host.Appearance.CardScale);
         Layout();
         if (IsLoaded) Reposition();
     }

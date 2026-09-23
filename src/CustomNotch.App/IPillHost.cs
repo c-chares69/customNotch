@@ -8,6 +8,9 @@ namespace CustomNotch.App;
 /// Une interface plutôt que le contrôleur lui-même, pour que les fenêtres se testent avec un hôte factice.</summary>
 public interface IPillHost
 {
+    /// <summary>L'apparence partagée courante (activité, échelle de la carte) : PillWindow y lit CardScale à
+    /// chaque reconstruction de ses métriques, sans passer par _config directement.</summary>
+    AppearanceConfig Appearance { get; }
     CellView? View(string cellId);
     /// <summary>Les vues des enfants d'une cellule-groupe, dans l'ordre de la config.</summary>
     IReadOnlyList<CellView> Children(CellConfig group);

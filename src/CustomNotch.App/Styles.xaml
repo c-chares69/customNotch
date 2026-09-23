@@ -41,13 +41,28 @@
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="Foreground" Value="{DynamicResource Muted}" />
     </Style>
-    <!-- Les boutons de la carte hover : fond #252525, bord #555, texte blanc (codenotch .c-auth button). -->
+    <!-- Les boutons de la carte hover : au thème (SurfaceHover / Fg), comme le reste de la carte depuis 0.2.2 ;
+         rayon 10 propre (celui de ButtonBase est 7), d'où un gabarit dédié plutôt qu'un simple Setter. -->
     <Style x:Key="CardButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
-        <Setter Property="FontSize" Value="11" />
-        <Setter Property="Padding" Value="9,6" />
-        <Setter Property="Background" Value="#252525" />
-        <Setter Property="BorderBrush" Value="#555555" />
-        <Setter Property="Foreground" Value="#FFFFFF" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Padding" Value="12,8" />
+        <Setter Property="Background" Value="{DynamicResource SurfaceHover}" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Opacity" Value="0.85" /></Trigger>
+                        <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5" /></Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
     <!-- Menus contextuels (clic droit sur la pilule) : le gabarit Windows est toujours clair ; on le remplace par une
          carte de la palette que Theme.Apply pose (Surface, Fg, Border, SurfaceHover, Accent) — même gabarit que

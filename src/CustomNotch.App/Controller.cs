@@ -165,6 +165,8 @@ public sealed class Controller : IPillHost
 
     // ---- IPillHost -------------------------------------------------------------------------------------------
 
+    public AppearanceConfig Appearance => _config.Current.Appearance;
+
     public CellView? View(string cellId)
     {
         var cell = _config.Current.Cell(cellId);
