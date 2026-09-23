@@ -21,7 +21,7 @@
           "id": "systeme",
           "label": "Système",
           "glyph": "cpu",               // nom d'un glyph connu (docs/ARCHITECTURE.md §6), ou un tracé SVG "M…"
-          "children": ["cpu", "mem", "disk", "net"],
+          "children": ["cpu", "mem", "disk", "net", "battery"],
           "headline": "cpu",            // doit être l'un des enfants ; par défaut : le pire statut des enfants
           "visible": true
         },
@@ -60,7 +60,22 @@
           "visible": false
         },
         {
-          // En attendant la source "clickup" du plan 2 (endpoint local de ClickUp-Extended) :
+          "id": "battery",
+          "source": "system.battery",   // pas de "params" : cette source n'en prend aucun
+          "label": "Batterie",
+          "glyph": "battery",
+          "visible": false
+        },
+        {
+          // Ce qui joue (Spotify, un onglet de navigateur, VLC…) : la session média système.
+          // Pas de "params" ; le clic (action par défaut de la source) fait lecture/pause.
+          "id": "media",
+          "source": "media",
+          "label": "Média",
+          "glyph": "music"
+        },
+        {
+          // En attendant la source "clickup" du plan 3 (endpoint local de ClickUp-Extended) :
           // un simple lanceur, comme n'importe quel raccourci de barre des tâches.
           "id": "clickup",
           "source": "launcher",
@@ -107,13 +122,15 @@
           "glyph": "terminal",
           "refresh": "1m",
           "params": {
-            "command": "echo 42",   // exécutée par cmd.exe /c ; jamais depuis le serveur des hooks (plan 2)
+            "command": "echo 42",   // exécutée par cmd.exe /c ; jamais depuis le serveur des hooks (plan 3)
             "parse": "number",      // number | json | text — comment lire la sortie
             "unit": "u"             // unité affichée après la valeur
           }
         },
         {
-          "id": "battery",
+          // Un id différent de celui du groupe "systeme" ci-dessus : chaque id de cellule est
+          // unique dans tout le fichier, même entre deux pilules.
+          "id": "batt",
           "source": "system.battery",  // pas de "params" : cette source n'en prend aucun
           "label": "Batterie",
           "glyph": "battery"

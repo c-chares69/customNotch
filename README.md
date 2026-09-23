@@ -12,24 +12,91 @@ Conception détaillée : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Versions 
 
 ## Installation
 
-Un exécutable unique, un raccourci dans le menu Démarrer, et le lancement à l'ouverture de session :
+### Option A - l'installateur (recommandé, c'est lui que l'on partage)
+
+Télécharge `customNotch-<version>-setup.exe` depuis les
+[releases GitHub](https://github.com/c-chares69/customNotch/releases) et double-clique.
+Il est produit par `scripts\package.ps1` avec [Inno Setup 6](https://jrsoftware.org/isinfo.php)
+(`winget install JRSoftware.InnoSetup`). Trois écrans, aucun droit administrateur :
+
+- installe dans `%LOCALAPPDATA%\Programs\customNotch`, raccourci du menu Démarrer, entrée
+  *Paramètres > Applications* avec désinstallation propre (qui propose de garder ou d'effacer
+  tes données) ;
+- pose le **runtime .NET 10 Desktop** s'il manque sur le poste (téléchargé chez Microsoft, une
+  fois par poste) : c'est ce qui garde l'application à quelques mégaoctets ;
+- case *Lancer à l'ouverture de session* : tâche planifiée relancée jusqu'à 3 fois en cas
+  d'échec, et tâche de surveillance toutes les 15 minutes (`--auto`, qui respecte un
+  « Quitter » volontaire) ;
+- arrête l'application en cours avant de remplacer ses fichiers, la relance à la fin ;
+- silencieux avec `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART` : c'est ainsi que la mise à jour
+  automatique la lancera, une fois le lecteur de manifeste écrit (plan 3).
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\publish.ps1 -Shortcut -Autostart -Run
+winget install Microsoft.DotNet.SDK.10                          # une fois
+powershell -ExecutionPolicy Bypass -File scripts\publish.ps1    # l'exécutable (dist\customNotch\)
+powershell -ExecutionPolicy Bypass -File scripts\package.ps1    # + setup.exe + zip + latest.json
 ```
 
-Cela produit `dist\customNotch\customNotch.exe` (fichier unique, ~25 Mo ; le runtime .NET 10 Desktop reste
-partagé — s'il manque, `winget install Microsoft.DotNet.DesktopRuntime.10`). Sans les options, le script
-publie seulement. En développement, `dotnet run --project src/CustomNotch.App` suffit.
+`publish.ps1 -SelfContained` embarque le runtime dans l'exécutable (≈ 64 Mo) pour un poste qui
+ne peut rien télécharger.
 
-L'installateur (Inno Setup, tâches planifiées, mises à jour) arrive avec le plan 2 ; en
-attendant, l'application se lance depuis les sources ou un `dotnet publish` fait à la main.
+### Option A bis - l'archive portable et `install.ps1`
+
+`customNotch-<version>-win64.zip` contient l'application, `install.ps1`, `Install.cmd` et
+`uninstall.ps1` : dézipper, double-cliquer `Install.cmd`. Même résultat que l'installateur,
+sans assistant (le runtime .NET 10 Desktop doit être présent :
+`winget install Microsoft.DotNet.DesktopRuntime.10`). `install.ps1` (aucun droit administrateur) :
+
+- copie l'application dans `%LOCALAPPDATA%\Programs\customNotch` ;
+- crée le raccourci du menu Démarrer - c'est aussi ce qui donne son nom et son icône aux
+  notifications Windows ;
+- inscrit l'application dans *Paramètres > Applications* avec une désinstallation propre
+  (`uninstall.ps1`, qui conserve tes données sauf `-RemoveData`) ;
+- enregistre deux tâches planifiées : **customNotch** à l'ouverture de session (relancée
+  jusqu'à 3 fois en cas d'échec) et **customNotch Watchdog** toutes les 15 minutes, qui la
+  relance si elle s'est arrêtée de façon inattendue. Si tu la quittes toi-même depuis l'icône,
+  le watchdog respecte ce choix jusqu'au prochain lancement volontaire.
+
+`scripts\package.ps1` produit les trois à la fois : l'installateur, l'archive portable et
+`dist\latest.json`, le manifeste des mises à jour (voir plus bas), qui pointe sur
+l'installateur.
+
+### Signature de l'exécutable
+
+Sans signature, SmartScreen avertit au premier lancement sur un nouveau poste. `publish.ps1`
+signe l'exe si un certificat est désigné par variable d'environnement, puis horodate la
+signature (elle reste valable après expiration du certificat) :
+
+| Variable | Rôle |
+| --- | --- |
+| `CUSTOMNOTCH_SIGN_THUMBPRINT` | empreinte d'un certificat du magasin personnel (carte, HSM, certificat installé) |
+| `CUSTOMNOTCH_SIGN_PFX` + `CUSTOMNOTCH_SIGN_PASSWORD` | ou un fichier `.pfx` |
+
+Sans certificat, la publication réussit et le dit : « non signé ».
+
+### Mises à jour
+
+Le manifeste `latest.json` (version, URL, empreinte SHA-256, notes) est produit par
+`scripts\package.ps1` et publié dès maintenant avec le setup et l'archive. La vérification
+*dans l'application* (*Réglages → Général → Mises à jour*), le téléchargement et
+l'installation silencieuse arrivent au plan 3 ; en attendant, une nouvelle version se pose à
+la main, depuis les releases GitHub.
+
+Publier une version : `scripts\package.ps1` puis `scripts\release.ps1`, qui crée la release
+GitHub `v<version>` (notes tirées de `CHANGELOG.md`) et y joint le setup, le zip et
+`latest.json`, avec le jeton que Git détient déjà. Le manifeste, une fois publié, est à
+`https://github.com/c-chares69/customNotch/releases/latest/download/latest.json`
+(dépôt public requis pour la mise à jour automatique ; sinon `package.ps1 -BaseUrl <adresse>`
+et déposer les fichiers sur un serveur ou un partage).
+
+En développement, `dotnet run --project src/CustomNotch.App` suffit.
 
 ## Configuration
 
-Au premier lancement, customNotch écrit un `cells.json` par défaut dans
-`%APPDATA%\customNotch\` (une pilule à droite : CPU, mémoire, disque, réseau, un lanceur
-ClickUp). Trois fichiers, trois rôles :
+Tout se règle dans **Réglages…** (icône du tray, ou clic droit sur une pilule). Au premier
+lancement, customNotch écrit un `cells.json` par défaut dans `%APPDATA%\customNotch\` (une
+pilule à droite : le groupe Système, ce qui joue, un lanceur ClickUp). Trois fichiers, trois
+rôles — c'est ce que Réglages écrit :
 
 | Fichier | Contenu | Synchronisable |
 |---|---|---|
@@ -41,7 +108,8 @@ ClickUp). Trois fichiers, trois rôles :
 `config.json` (`%APPDATA%\customNotch\config.json`) donne son chemin. Les deux autres fichiers
 restent toujours dans `%APPDATA%\customNotch\` — ou `--home <dossier>`, la variable
 `CUSTOMNOTCH_HOME`, ou le mode portable (dossier `data\` avec un fichier vide `portable` à côté
-de l'exe).
+de l'exe). `cells.json` reste lisible et synchronisable ; l'éditer à la main reste possible
+mais ses commentaires disparaissent à la première sauvegarde par l'interface.
 
 Les champs de `cells.json` acceptent des placeholders, résolus au chargement : `${env:NOM}`
 (une variable d'environnement), `${secret:nom}` (une valeur de `secrets.json`), `${home}` (le
@@ -73,13 +141,13 @@ commentaire) : [docs/cells.example.json](docs/cells.example.json).
 | `system.disk` | `drive` (« C: ») | anneau, Go utilisés / total, action « ouvrir » |
 | `system.network` | `iface` (facultatif) | débit Ko/s ou Mo/s, historique |
 | `system.battery` | — | anneau %, secteur ou temps restant |
+| `media` | — | titre — artiste de ce qui joue, occupée en lecture, actions précédent / lecture-pause / suivant |
 | `http` | `url`, `method`, `path`, `textPath`, `max`, `unit`, `headers`, `body` | valeur ou texte extrait d'une réponse JSON |
 | `shell` | `command`, `parse`, `path`, `max`, `unit`, `timeoutSeconds` | valeur, JSON pointé, ou texte de sortie d'une commande |
 | `launcher` | `open` | rien à lire : un glyph et une action « ouvrir » |
 
 Détail des params de chaque source : [docs/ARCHITECTURE.md §5](docs/ARCHITECTURE.md#5-sources).
-`claude`, `media` et `clickup` (usage Claude Code, session média système, timer ClickUp) sont
-des sous-projets du plan 2.
+`claude` et `clickup` (usage Claude Code, timer ClickUp) sont des sous-projets du plan 3.
 
 ## Développement
 
