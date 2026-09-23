@@ -136,9 +136,15 @@ public sealed class ConfigEditor
         CommitShared(root);
     }
 
+    /// <summary>Deux façons d'échouer, distinguées ici parce que ConfigStore.LastErrors ne les distingue pas :
+    /// l'écriture peut échouer (fichier local verrouillé) alors que le rechargement qui suit, lui, réussit
+    /// (il relit l'ancien contenu, jamais touché) — LastErrors reste alors vide et un bandeau vide n'aiderait
+    /// personne. La validation refusée, elle, remplit toujours LastErrors.</summary>
     public void SetPillLocal(string pillId, Action<JsonObject> mutate)
     {
-        if (!_store.SetPillLocal(pillId, mutate)) throw new ConfigException(string.Join(" ; ", _store.LastErrors));
+        if (_store.SetPillLocal(pillId, mutate)) return;
+        if (_store.LastErrors.Count == 0) throw new ConfigException($"{Path.GetFileName(_store.LocalPath)} n'a pas pu être écrit (fichier verrouillé ?)");
+        throw new ConfigException(string.Join(" ; ", _store.LastErrors));
     }
 
     public void MovePill(string pillId, int delta)
@@ -247,14 +253,28 @@ public sealed class ConfigEditor
 
     public void SetSecret(string name, string value)
     {
+        var previous = _store.Secrets.Get(name);
         if (!_store.Secrets.Set(name, value)) throw new ConfigException("secrets.json n'a pas pu être écrit (fichier verrouillé ?)");
-        if (!_store.Load()) throw new ConfigException(string.Join(" ; ", _store.LastErrors));
+        if (!_store.Load()) RollbackSecret(name, previous);
     }
 
     public void RemoveSecret(string name)
     {
+        var previous = _store.Secrets.Get(name);
         if (!_store.Secrets.Remove(name)) throw new ConfigException("secrets.json n'a pas pu être écrit (fichier verrouillé ?)");
-        if (!_store.Load()) throw new ConfigException(string.Join(" ; ", _store.LastErrors));
+        if (!_store.Load()) RollbackSecret(name, previous);
+    }
+
+    /// <summary>Le secret vient d'être écrit (posé ou retiré) mais la config qui en dépend est refusée — par exemple
+    /// un champ requis dont le placeholder ne se résout plus une fois le secret retiré. On remet l'ancienne valeur
+    /// (ou on l'enlève si elle n'existait pas avant), on recharge, puis on lève avec les erreurs de validation :
+    /// jamais un secret perdu pour une modification qui n'a pas pu s'appliquer.</summary>
+    private void RollbackSecret(string name, string? previous)
+    {
+        var message = string.Join(" ; ", _store.LastErrors);
+        var restored = previous is null ? _store.Secrets.Remove(name) : _store.Secrets.Set(name, previous);
+        if (!restored || !_store.Load()) message += " (et le retour arrière a échoué : vérifier secrets.json)";
+        throw new ConfigException(message);
     }
 
     public void SetSourceGlobal(string sourceType, Action<JsonObject> mutate)

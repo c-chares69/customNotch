@@ -45,11 +45,14 @@ public sealed class ConfigStore : IDisposable
     public CellsFile Current { get; private set; }
     public IReadOnlyList<string> LastErrors { get; private set; } = Array.Empty<string>();
 
-    /// <summary>Lit, fusionne, résout, valide. Rend true si une nouvelle configuration est en service.</summary>
+    /// <summary>Lit, fusionne, résout, valide. Rend true si une nouvelle configuration est en service. Après
+    /// Dispose(), ne fait plus rien : un rechargement tardif (minuterie en vol, appelant qui n'a pas vu l'arrêt)
+    /// n'a plus d'auditeur valide — Changed/Rejected ne doivent plus partir vers une UI ou un Controller fermés.</summary>
     public bool Load()
     {
         lock (_lock)
         {
+            if (_disposed) return false;
             try
             {
                 if (!File.Exists(CellsPath))
@@ -148,8 +151,11 @@ public sealed class ConfigStore : IDisposable
         lock (_lock)
         {
             JsonObject root;
+            // JSON malformé ou fichier verrouillé (IOException/UnauthorizedAccessException) : on repart d'un
+            // document vide plutôt que de laisser une exception brute sortir d'ici. L'écriture qui suit échoue
+            // alors elle-même proprement (WriteAtomic rend false), et c'est ce que l'appelant voit.
             try { root = File.Exists(LocalPath) ? CellsJson.Parse(File.ReadAllText(LocalPath)) : new JsonObject(); }
-            catch (ConfigException) { root = new JsonObject(); }
+            catch (Exception ex) when (ex is ConfigException or IOException or UnauthorizedAccessException) { root = new JsonObject(); }
             if (root["pills"] is not JsonArray pills) root["pills"] = pills = new JsonArray();
             var pill = pills.OfType<JsonObject>().FirstOrDefault(p => p["id"]?.GetValue<string>() == pillId);
             if (pill is null) pills.Add(pill = new JsonObject { ["id"] = pillId });

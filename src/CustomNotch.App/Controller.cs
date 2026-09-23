@@ -150,11 +150,15 @@ public sealed class Controller : IPillHost
         _stopped = true;
         Microsoft.Win32.SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
         _tick.Stop();
+        // La fenêtre Réglages ferme en premier : son SourcesPage/PillsPage tiennent des abonnements à _config,
+        // et ConfigStore.Dispose() ne notifie plus rien ensuite — la fermer après aurait laissé de l'UI vivante
+        // sans plus jamais se mettre à jour, plutôt que se fermer proprement.
+        _settings?.Close();
+        _settings = null;
         _scheduler.Dispose();
         _config.Dispose();
         _media.Dispose();
         _tray.Dispose();
-        _settings?.Close();
         foreach (var p in _pills.Values) p.Close();
         _pills.Clear();
     }

@@ -127,4 +127,29 @@ public class ConfigEditorTests : IDisposable
         using var lockHandle = new FileStream(Paths.SecretsFile(_home), FileMode.Open, FileAccess.ReadWrite, FileShare.None);
         Assert.Throws<ConfigException>(() => _editor.SetSecret("a", "c"));
     }
+
+    [Fact]
+    public void Un_fichier_local_verrouille_donne_un_message()
+    {
+        using var lockHandle = new FileStream(_store.LocalPath, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
+        var ex = Assert.Throws<ConfigException>(() => _editor.SetPillLocal("main", p => p["along"] = 0.2));
+        Assert.NotEmpty(ex.Message);
+    }
+
+    [Fact]
+    public void Retirer_un_secret_indispensable_est_annule()
+    {
+        // Un lanceur dont le champ requis « open » ne vit que par un secret : le retirer laisserait un
+        // placeholder non résolu (champ présent mais vide), refusé par la validation sur un champ requis.
+        var placeholder = ConfigEditor.SecretPlaceholder("c", "open");
+        File.WriteAllText(_store.CellsPath, """{"pills":[{"id":"main","cells":[{"id":"c","source":"launcher","params":{"open":"PLACEHOLDER"}}]}]}""".Replace("PLACEHOLDER", placeholder));
+        // Écrire le secret recharge tout de suite : c'est là que le placeholder se résout pour la première fois.
+        _editor.SetSecret("c.open", "x");
+        Assert.Equal("x", _store.Current.Cell("c")!.Params!["open"]!.GetValue<string>());
+
+        var ex = Assert.Throws<ConfigException>(() => _editor.RemoveSecret("c.open"));
+        Assert.NotEmpty(ex.Message);
+        Assert.Contains("c.open", _store.Secrets.Names);
+        Assert.True(new ConfigStore(_home, Schemas).Load());
+    }
 }

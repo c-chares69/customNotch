@@ -140,4 +140,20 @@ public class ConfigStoreTests : IDisposable
         await Task.Delay(500);
         Assert.Equal(countAtDispose, changedCount);
     }
+
+    [Fact]
+    public void Apres_dispose_load_ne_notifie_plus()
+    {
+        File.WriteAllText(Path.Combine(_home, "cells.json"), """{"pills":[{"id":"only","cells":[{"id":"c","source":"system.cpu","label":"A"}]}]}""");
+        var store = new ConfigStore(_home, Known);
+        Assert.True(store.Load());
+        var count = 0;
+        store.Changed += _ => count++;
+        store.Dispose();
+        // Un rechargement demandé après Dispose() (minuterie en vol, appelant qui n'a pas vu l'arrêt) n'a plus
+        // d'auditeur valide : Load() ne doit ni lire ni notifier, même si le contenu a changé entre-temps.
+        File.WriteAllText(store.CellsPath, """{"pills":[{"id":"only","cells":[{"id":"c","source":"system.cpu","label":"B"}]}]}""");
+        Assert.False(store.Load());
+        Assert.Equal(0, count);
+    }
 }

@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using CustomNotch.Core.Config;
 
 namespace CustomNotch.App.Settings;
 
@@ -7,10 +8,12 @@ namespace CustomNotch.App.Settings;
 /// leurs noms, jamais leurs valeurs.</summary>
 public sealed class SourcesPage : PageBase
 {
+    private readonly EditorBanner _banner = new();
     private readonly StackPanel _secrets = new();
 
     public SourcesPage(SettingsContext ctx) : base(ctx, "Sources", "Ce qui vaut pour toutes les cellules d'un même type, et les secrets chiffrés sur ce poste.")
     {
+        Body.Children.Add(_banner);
         var none = Ui.Text("Aucune source livrée avec cette version n'a de réglage global. Claude Code et ClickUp en auront.", 12, null, "Muted");
         none.TextWrapping = TextWrapping.Wrap;
         Body.Children.Add(Section("Réglages globaux"));
@@ -28,7 +31,13 @@ public sealed class SourcesPage : PageBase
         foreach (var name in names)
         {
             var row = new DockPanel { Margin = new Thickness(0, 3, 0, 3) };
-            var remove = Btn("Effacer", () => Ctx.Editor.RemoveSecret(name), "GhostButton");
+            // Retirer un secret qu'un champ requis résout encore est refusé (ConfigEditor restaure la valeur) :
+            // le message remonte ici, sous la liste, plutôt que de disparaître dans une exception non attrapée.
+            var remove = Btn("Effacer", () =>
+            {
+                try { Ctx.Editor.RemoveSecret(name); _banner.Clear(); }
+                catch (ConfigException ex) { _banner.Show(ex.Message); }
+            }, "GhostButton");
             DockPanel.SetDock(remove, Dock.Right);
             row.Children.Add(remove);
             var defined = Ui.Text("défini", 11, null, "Muted"); defined.Margin = new Thickness(12, 0, 12, 0); DockPanel.SetDock(defined, Dock.Right);
